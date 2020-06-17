@@ -1,0 +1,19 @@
+version: '3.0'
+volumes:
+  gopkg:
+
+services:
+  pingr:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      args:
+        UID: ${UID}
+    environment:
+      DEV: |-
+        true
+    ports:
+    - "8080:8080"
+    volumes:
+      - gopkg:/go/pkg
+      - .:/go/src/pingr

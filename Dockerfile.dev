@@ -1,0 +1,44 @@
+FROM golang:1.13
+
+RUN go get github.com/mattn/go-sqlite3 && \
+    go install github.com/mattn/go-sqlite3 &&\
+    go get -u -v github.com/codeskyblue/fswatch
+
+
+
+
+
+## Mount src/pingr
+
+
+
+RUN echo "desc: re builds go  \n\
+triggers:  \n\
+  - name: ''  \n\
+    pattens: \n\
+      - '**/*.go'  \n\
+      - '**/*.html'  \n\
+      - '**/*.css'  \n\
+    env:  \n\
+      DEBUG: '1'  \n\
+    cmd: go run /go/src/pingr/cmd/pingrd/pingrd.go  \n\
+    shell: true  \n\
+    delay: 100ms  \n\
+    stop_timeout: 500ms  \n\
+    signal: KILL  \n\
+    kill_signal: 'SIGTERM'  \n\
+watch_paths: \n\
+  - .  \n\
+watch_depth: 10  \n\
+" > /fsw.yml
+
+
+
+#ARG UID
+#RUN groupadd --gid $UID pingr && useradd --uid $UID --gid pingr --shell /bin/bash --create-home pingr
+#USER pingr
+#RUN mkdir -p /go/src/pingr &&  mkdir -p /go/pkg
+WORKDIR /go/src/pingr
+
+# run fswatch
+CMD fswatch -config /fsw.yml

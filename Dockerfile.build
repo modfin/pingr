@@ -1,0 +1,28 @@
+# get alpine based bob
+FROM repo.modfin.se/bob-alpine:latest as base-builder
+# or get debian based bob
+# FROM repo.modfin.se/bob-alpine:latest as base-builder
+
+# First we created a cashed layer with all the dependencies
+## Hm... might create issues with crosse dependencis between different projects where reallative paths in go mod is used..
+RUN mkdir -p /go/src/pingr/pingr
+COPY ./pingr/go.mod /go/src/pingr/pingr/go.mod
+COPY ./pingr/go.sum /go/src/pingr/pingr/go.sum
+RUN cd /go/src/pingr/pingr; go mod download
+
+
+
+
+FROM base-builder as builder
+
+# then we copy the source and compile
+COPY . /go/src/pingr
+RUN cd /go/src/pingr/pingr && go build -o /pingrd ./cmd/pingrd.go
+
+
+# copy the binary to a clean alpine image
+FROM alpine
+EXPOSE 8080
+COPY --from=builder /pingrd /
+RUN apk add --no-cache tzdata ca-certificates
+CMD /pingrd
