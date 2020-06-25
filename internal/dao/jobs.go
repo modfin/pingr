@@ -17,7 +17,7 @@ func GetJobs(db *sql.DB) ([]Job, error) {
 	var jobs []Job
 	for rows.Next() {
 		var j Job
-		err := rows.Scan(&j.JobId, &j.TestType, &j.Url, &j.Interval, &j.CreatedAt)
+		err := rows.Scan(&j.JobId, &j.TestType, &j.Url, &j.Interval, &j.Timeout, &j.CreatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -30,27 +30,26 @@ func GetJobs(db *sql.DB) ([]Job, error) {
 	return jobs, nil
 }
 
-func GetJob(id string, db *sql.DB) (*Job, error) {
+func GetJob(id string, db *sql.DB) (j Job, err error) {
 	q := `
-		SELECT * FROM jobs WHERE JobId = ?
+		SELECT * FROM jobs WHERE job_id = ?
 	`
 	stmt, err := db.Prepare(q)
 	if err != nil {
-		return nil, err
+		return
 	}
 	defer stmt.Close()
 
-	var j Job
-	err = stmt.QueryRow(id).Scan(&j.JobId, &j.TestType, &j.Url, &j.Interval, &j.CreatedAt)
+	err = stmt.QueryRow(id).Scan(&j.JobId, &j.TestType, &j.Url, &j.Interval, &j.Timeout, &j.CreatedAt)
 	if err != nil {
-		return nil, err
+		return
 	}
-	return &j, nil
+	return
 }
 
 func GetJobLogs(id string, db *sql.DB) ([]Log, error) {
 	q := `
-		SELECT * FROM logs WHERE JobId = ?
+		SELECT * FROM logs WHERE job_id = ?
 	`
 
 	stmt, err := db.Prepare(q)
@@ -83,7 +82,7 @@ func GetJobLogs(id string, db *sql.DB) ([]Log, error) {
 
 func PostJob(job Job, db *sql.DB) error {
 	q := `
-		INSERT INTO jobs(TestType, Url, Interval, CreatedAt) values(?, ?, ?, ?);
+		INSERT INTO jobs(test_type, url, interval, timeout, created_at) values(?,?,?,?,?);
 	`
 	tx, err := db.Begin()
 	if err != nil {
@@ -96,7 +95,7 @@ func PostJob(job Job, db *sql.DB) error {
 	}
 	defer stmt.Close()
 
-	_, err = stmt.Exec(job.TestType, job.Url, job.Interval, job.CreatedAt)
+	_, err = stmt.Exec(job.TestType, job.Url, job.Interval, job.Timeout, job.CreatedAt)
 	if err != nil {
 		return err
 	}
@@ -112,11 +111,12 @@ func PostJob(job Job, db *sql.DB) error {
 func PutJob(job Job,  db *sql.DB)  error {
 	q := `
 		UPDATE jobs 
-		SET TestType = ?,
-			Url = ?,
-			Interval = ?,
-			CreatedAt = ?
-		WHERE JobId = ?
+		SET test_type = ?,
+			url = ?,
+			interval = ?,
+		    timeout = ?,
+			created_at = ?
+		WHERE job_id = ?
 	`
 	tx, err := db.Begin()
 	if err != nil {
@@ -129,7 +129,7 @@ func PutJob(job Job,  db *sql.DB)  error {
 	}
 	defer stmt.Close()
 
-	_, err = stmt.Exec(job.TestType, job.Url, job.Interval, job.CreatedAt, job.JobId)
+	_, err = stmt.Exec(job.TestType, job.Url, job.Interval, job.Timeout, job.CreatedAt, job.JobId)
 	if err != nil {
 		return err
 	}
@@ -145,7 +145,7 @@ func PutJob(job Job,  db *sql.DB)  error {
 func DeleteJob(id string,  db *sql.DB) error {
 	q := `
 		DELETE FROM jobs 
-		WHERE JobId = ?
+		WHERE job_id = ?
 	`
 	tx, err := db.Begin()
 	if err != nil {

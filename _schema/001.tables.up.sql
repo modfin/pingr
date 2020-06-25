@@ -1,19 +1,29 @@
 -- name: create-jobs-table
 CREATE TABLE IF NOT EXISTS jobs (
-    JobId INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-    TestType VARCHAR(255),
-    Url VARCHAR(255),
-    Interval INTERVAL,
-    CreatedAt DATE
+    job_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    test_type TEXT CHECK( test_type IN (
+                                                'HTTP',
+                                                'Prometheus',
+                                                'TLS',
+                                                'DNS',
+                                                'Ping',
+                                                'SSH',
+                                                'TCP'
+                                            )
+                                ),
+    url TEXT NOT NULL,
+    interval INTEGER NOT NULL,
+    timeout  INTEGER NOT NULL,
+    created_at TIMESTAMP NOT NULL
 );
 
 -- name: create-logs-table
 CREATE TABLE IF NOT EXISTS logs (
-    LogId INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-    JobId INTEGER,
-    Status INTEGER(1),
-    Message VARCHAR(255),
-    CreatedAt DATE,
-    FOREIGN KEY (JobId)
-        REFERENCES jobs (JobId)
+    log_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    job_id INTEGER NOT NULL,
+    status INTEGER NOT NULL,
+    message TEXT NOT NULL,
+    created_at TIMESTAMP NOT NULL,
+    FOREIGN KEY (job_id)
+        REFERENCES jobs (job_id)
 );

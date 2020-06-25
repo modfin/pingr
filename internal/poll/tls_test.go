@@ -96,7 +96,7 @@ var badTLS = []struct {
 		port: "https",
 		exp:"remote error: tls: handshake failure",
 	},
-	//{ // TODO implment check for this
+	//{ // TODO implement check for this
 	//	host: "no-sct.badssl.com",
 	//	port: "https",
 	//	exp:"remote error: tls: handshake failure",

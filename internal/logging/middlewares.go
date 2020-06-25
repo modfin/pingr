@@ -38,7 +38,7 @@ func EchoMiddleware(skipper middleware.Skipper) echo.MiddlewareFunc {
 			entry = entry.WithField("uri", req.RequestURI)
 			entry = entry.WithField("method", req.Method)
 			entry = entry.WithField("host", req.Host)
-			entry = entry.WithField("status", res.Status)
+			entry = entry.WithField("Status", res.Status)
 
 			if err != nil {
 				entry.Error()

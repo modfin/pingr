@@ -28,20 +28,76 @@ func GetLogs(db *sql.DB) ([]Log, error) {
 	return logs, nil
 }
 
-func GetLog(id string, db *sql.DB) (*Log, error) {
+func GetLog(id string, db *sql.DB) (l Log, err error) {
 	q := `
-		SELECT * FROM logs WHERE LogId = ?
+		SELECT * FROM logs WHERE log_id = ?
 	`
 	stmt, err := db.Prepare(q)
 	if err != nil {
-		return nil, err
+		return
 	}
 	defer stmt.Close()
 
-	var l Log
 	err = stmt.QueryRow(id).Scan(&l.LogId, &l.JobId, &l.Status, &l.Message, &l.CreatedAt)
 	if err != nil {
-		return nil, err
+		return
 	}
-	return &l, nil
+	return
+}
+
+func PostLog(log Log, db *sql.DB) error {
+	q := `
+		INSERT INTO logs(job_id, status, message, created_at) VALUES(?,?,?,?);
+	`
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+
+	stmt, err := tx.Prepare(q)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	_, err = stmt.Exec(log.JobId, log.Status, log.Message, log.CreatedAt)
+	if err != nil {
+		return err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func DeleteLog(logId string, db *sql.DB) error {
+	q := `
+		DELETE FROM logs
+		WHERE log_id = ?
+	`
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+
+	stmt, err := tx.Prepare(q)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	_, err = stmt.Exec(logId)
+	if err != nil {
+		return err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

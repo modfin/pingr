@@ -2,17 +2,17 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	_ "github.com/mattn/go-sqlite3"
 	log "github.com/sirupsen/logrus"
 	"os"
 	"os/signal"
 	"pingr/internal/config"
+	"pingr/internal/dao"
 	"pingr/internal/logging"
 	"pingr/internal/resources"
+	"pingr/internal/scheduler"
 	"syscall"
 	"time"
-	"github.com/gchaincl/dotsql"
 )
 
 func main() {
@@ -28,18 +28,22 @@ func main() {
 
 	log.WithField("pid", os.Getpid()).Info("Starting pingr")
 
-	db, err := initDB()
+	db, err := dao.InitDB()
 	if err != nil {
 		log.Fatal("Could not load the database: ", err)
 	}
 	defer db.Close()
-
 	log.WithField("pid", os.Getpid()).Info("DB initialized")
+
+	log.WithField("pid", os.Getpid()).Info("Starting scheduler")
+	go scheduler.Scheduler(db)
 
 	resources.Init(closing, db)
 
+
 	log.Info("Terminating service")
 }
+
 
 func signaling(cancel context.CancelFunc) {
 	signals := make(chan os.Signal, 1)
@@ -70,50 +74,4 @@ func signaling(cancel context.CancelFunc) {
 	}
 }
 
-func initDB() (*sql.DB, error) {
-	if !fileExists("data.db") {
-		file, err := os.Create("data.db")
-		if err != nil {
-			return nil, err
-		}
-		file.Close()
-	}
 
-	db, err := sql.Open("sqlite3", "data.db")
-	if err != nil {
-		return nil, err
-	}
-
-	err = setupTables(db)
-	if err != nil {
-		return nil, err
-	}
-
-	return db, nil
-}
-
-func setupTables(db *sql.DB) error {
-	dot, err := dotsql.LoadFromFile("./_schema/001.tables.up.sql")
-	if err != nil {
-		return err
-	}
-
-	_, err = dot.Exec(db, "create-jobs-table")
-	if err != nil {
-		return err
-	}
-
-	_, err = dot.Exec(db, "create-logs-table")
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func fileExists(filename string) bool {
-	if _, err := os.Stat(filename); os.IsNotExist(err) {
-		return false
-	}
-	return true
-}
