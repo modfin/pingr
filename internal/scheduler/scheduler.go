@@ -11,8 +11,7 @@ import (
 )
 
 const (
-
-	JobTimeoutDuration = 1 * time.Minute
+	JobTimeoutCheckInterval = 1 * time.Minute
 	DataBaseListenerInterval = 10 * time.Minute
 
 	JobInitialized = 1
@@ -21,21 +20,17 @@ const (
 	JobClosed = 4
 	JobTimedOut = 5
 	JobError = 6
-
-	JobInitMessage = "New/Updated job has been initialized."
 )
 
 var (
-	jobs = make(map[string] dao.Job)
-	status = make(map[string]jobStatus)
+	jobs = make(map[uint64] dao.Job)
+	status = make(map[uint64]*jobStatus)
 
-	notifyDBHandler = make(chan int)
 	logChan = make(chan dao.Log, 100)
 	newJobChan = make(chan dao.Job, 10)
-	deletedJobChan = make(chan string, 10)
+	deletedJobChan = make(chan uint64, 10)
 
     muJobs sync.RWMutex
-	muStatus sync.RWMutex
 )
 
 type jobStatus struct {
@@ -43,136 +38,98 @@ type jobStatus struct {
 	CloseChan	chan int
 	LastUpdated	time.Time
 	Timeout 	time.Duration
+	Mu 			sync.RWMutex
 }
 
 func Scheduler(db *sql.DB) error {
 	log.Info("Starting scheduler")
 
+	go logger(db)
+
 	initVars(db)
 
-
 	go dataBaseListener(db) // Best way to handle DB error??
+
+	go jobTimeoutHandler()
 
 	for {
 		select {
 			case newJob := <- newJobChan:
-				var closeChan chan int
-				if _, ok := status[newJob.JobId]; !ok {
-					// New job
-					closeChan = make(chan int)
-					go worker(newJob.JobId, closeChan)
-				} else {
-					closeChan = status[newJob.JobId].CloseChan
-				}
-				status[newJob.JobId] = jobStatus{
-					Status:		 JobInitialized,
-					CloseChan: 	 closeChan,
-					LastUpdated: time.Now(),
-					Timeout: 	 newJob.Timeout,
-				}
+				// New/updated job has to be processed
 				muJobs.Lock()
 				jobs[newJob.JobId] = newJob
-				muJobs.Unlock()
 
-				log.Info(JobInitMessage + " JobId: " + newJob.JobId)
-
-				l := dao.Log{
-					JobId:     newJob.JobId,
-					Status:    JobInitialized,
-					Message:   JobInitMessage,
-					CreatedAt: time.Now(),
+				if _, ok := status[newJob.JobId]; !ok {
+					// New job
+					closeChan := make(chan int)
+					setNewJobInitialized(newJob, closeChan)
+					go worker(newJob.JobId, closeChan)
+				} else {
+					setUpdatedJobInitialized(newJob.JobId)
 				}
-				logChan <- l
+				muJobs.Unlock()
 
 			case deletedJobId := <- deletedJobChan:
-				close(status[deletedJobId].CloseChan)
+				// Deleted job has to be processed
 				muJobs.Lock()
-				delete(jobs, deletedJobId)
-				muJobs.Unlock()
-				delete(status, deletedJobId)
-				log.Info(fmt.Sprintf("JobID: %s, Job closed", deletedJobId))
-				l := dao.Log{
-					JobId:     deletedJobId,
-					Status:    JobClosed,
-					Message:   "Job closed",
-					CreatedAt: time.Now(),
+				if _, ok := status[deletedJobId]; ok {
+					close(status[deletedJobId].CloseChan)
+					delete(status, deletedJobId)
 				}
-				logChan <- l
-
+				if _, ok := jobs[deletedJobId]; ok {
+					delete(jobs, deletedJobId)
+					log.Info(fmt.Sprintf("JobID: %d, Job closed", deletedJobId))
+					l := dao.Log{
+						JobId:     deletedJobId,
+						Status:    JobClosed,
+						Message:   "Job closed",
+						CreatedAt: time.Now(),
+					}
+					logChan <- l
+				}
+				muJobs.Unlock()
 		}
 	}
 }
 
-func initVars(db *sql.DB) {
-	jobsDB, err := dao.GetJobs(db)
-	if err != nil {
-		log.Warn(err)
-	}
-
-	log.Info("Starting logger")
-	go logger(db)
-
-	muJobs.Lock()
-	for _, job := range jobsDB {
-		jobs[job.JobId] = job
-
-		closeChan := make(chan int)
-		go worker(job.JobId, closeChan)
-		status[job.JobId] = jobStatus{
-			Status:      JobInitialized,
-			CloseChan:	 closeChan,
-			LastUpdated: time.Now(),
-			Timeout:     job.Timeout,
-		}
-		log.Info(JobInitMessage + " JobId: " + job.JobId)
-		l := dao.Log{
-			JobId:     job.JobId,
-			Status:    JobInitialized,
-			Message:   JobInitMessage,
-			CreatedAt: time.Now(),
-		}
-
-		logChan <- l
-	}
-	muJobs.Unlock()
-}
-
-func worker(jobId string, close chan int) {
-	var job dao.Job
+func worker(jobId uint64, close chan int) {
 	for {
 		muJobs.RLock()
-		job = jobs[jobId]
-		muJobs.RUnlock()
-
-		
-		log.Info(fmt.Sprintf("Starting job. JobID: %s, Type: %s", job.JobId, job.TestType))
-		l := dao.Log{
-			JobId:     job.JobId,
-			Status:    JobRunning,
-			Message:   "Job started",
-			CreatedAt: time.Now(),
+		job, ok := jobs[jobId]
+		if !ok {
+			muJobs.RUnlock()
+			return
 		}
-		logChan <- l
+
+		_, ok = status[jobId]
+		if !ok {
+			muJobs.RUnlock()
+			return
+		}
+
+		setJobRunning(job)
 
 		var err error
-		if job.TestType == "TLS" {
-			err = poll.TLS(job.Url, "HTTPS") // Handle errors more than just logging
-
+		switch job.TestType {
+		case "TLS":
+			err = poll.TLS(job.Url, "HTTPS")
 		}
+
+		muJobs.RLock()
+		_, ok = status[jobId]
+		if !ok {
+			// Has the job been deleted while it was running?
+			muJobs.RUnlock()
+			return
+		}
+
 		if err != nil {
-			// Handle error more than log it
-			log.Info(fmt.Sprintf("JobID: %s has failed with error: %s", job.JobId, err))
+			// TODO: Handle error better
+			setJobError(jobId, err)
 		} else {
-			log.Info(fmt.Sprintf("JobID: %s has succeded, sleeping %d seconds", job.JobId, job.Interval))
+			setJobWaiting(job)
 		}
-
-		l = dao.Log{
-			JobId:     job.JobId,
-			Status:    JobWaiting,
-			Message:   "Job finished, sleeping",
-			CreatedAt: time.Now(),
-		}
-		logChan <- l
+		muJobs.RUnlock()
 
 		select {
 		case <-time.After(job.Interval * time.Second):
@@ -195,47 +152,172 @@ func logger(db *sql.DB) {
 }
 
 func jobTimeoutHandler() {
-
-}
-
-func Notify() {
-	notifyDBHandler <- 1
+	time.Sleep(JobTimeoutCheckInterval)
+	for {
+		log.Info("Checking for timed out jobs")
+		for jobId, jStatus := range status {
+			if jStatus.Status == JobRunning {
+				jStatus.Mu.RLock()
+				if time.Now().After(jStatus.LastUpdated.Add(time.Second*jStatus.Timeout)) {
+					// Job has timed out
+					// TODO: Handle error better
+					log.Error(fmt.Sprintf("JobID: %d, Timed out", jobId))
+				}
+				jStatus.Mu.RUnlock()
+			}
+		}
+		time.Sleep(JobTimeoutCheckInterval)
+	}
 }
 
 func dataBaseListener(db *sql.DB) {
 	for {
 		select {
 			case <-time.After(DataBaseListenerInterval):
-			case <-notifyDBHandler:
-		}
-		log.Info("Looking for new/updated jobs in DB")
-		newJobs, err := dao.GetJobs(db)
-		if err != nil {
-			continue // Bad
-		}
+				log.Info("Looking for new/updated jobs in DB")
+				jobsDB, err := dao.GetJobs(db)
+				if err != nil {
+					continue // Bad
+				}
 
-		// Look for new/updated job
-		muJobs.RLock()
-		for _, j := range newJobs {
-			if jobs[j.JobId] != j { // Found a new/changed job
-				newJobChan <- j
-			}
-		}
+				newJobs := make([]dao.Job, 0)
+				deletedJobs := make([]uint64, 0)
 
-		// Fairly slow but probably okay since user wont update
-		// jobs that often, ALSO: Potential deadlock
+				// Look for new/updated job
+				muJobs.RLock()
+				for _, j := range jobsDB {
+					if jobs[j.JobId] != j { // Found a new/updated job
+						newJobs = append(newJobs, j)
+					}
+				}
 
-		// Look for deleted jobs
-		for jobId := range jobs {
-			if !stringInSlice(jobId, newJobs) {
-				deletedJobChan <- jobId
-			}
+				// Look for deleted jobs
+				for jobId := range jobs {
+					// slow but probably okay since user wont update/add
+					if !intInSlice(jobId, jobsDB) {
+						deletedJobs = append(deletedJobs, jobId)
+					}
+				}
+				muJobs.RUnlock()
+
+				// Save result in array and send on channel after Unlock to avoid deadlock
+				for _, newJob := range newJobs {
+					newJobChan <- newJob
+				}
+				for _, jobId := range deletedJobs {
+					deletedJobChan <- jobId
+				}
 		}
-		muJobs.RUnlock()
 	}
 }
 
-func stringInSlice(a string, list []dao.Job) bool {
+func initVars(db *sql.DB) {
+	jobsDB, err := dao.GetJobs(db)
+	if err != nil {
+		log.Warn(err)
+	}
+
+	muJobs.Lock()
+	for _, job := range jobsDB {
+		jobs[job.JobId] = job
+
+		closeChan := make(chan int)
+		setNewJobInitialized(job, closeChan)
+
+		go worker(job.JobId, closeChan)
+	}
+	muJobs.Unlock()
+}
+
+func setNewJobInitialized(job dao.Job, closeChan chan int) {
+	jStatus := jobStatus{
+		Status:      JobInitialized,
+		CloseChan:	 closeChan,
+		LastUpdated: time.Now(),
+		Timeout:     job.Timeout,
+	}
+	status[job.JobId] = &jStatus
+
+	log.Info(fmt.Sprintf("JobID: %d, Initialized", job.JobId))
+	l := dao.Log{
+		JobId:     job.JobId,
+		Status:    JobInitialized,
+		Message:   "New/Updated job has been initialized.",
+		CreatedAt: time.Now(),
+	}
+	logChan <- l
+}
+
+func setUpdatedJobInitialized(jobId uint64) {
+	status[jobId].LastUpdated = time.Now()
+	status[jobId].Status = JobInitialized
+
+	log.Info(fmt.Sprintf("JobID: %d, Initialized", jobId))
+	l := dao.Log{
+		JobId:     jobId,
+		Status:    JobInitialized,
+		Message:   "New/Updated job has been initialized.",
+		CreatedAt: time.Now(),
+	}
+	logChan <- l
+}
+
+func setJobRunning(job dao.Job) {
+	status[job.JobId].Mu.Lock()
+	status[job.JobId].Status = JobRunning
+	status[job.JobId].LastUpdated = time.Now()
+	status[job.JobId].Mu.Unlock()
+	muJobs.RUnlock()
+
+	log.Info(fmt.Sprintf("Starting job. JobID: %d Type: %s", job.JobId, job.TestType))
+	l := dao.Log{
+		JobId:     job.JobId,
+		Status:    JobRunning,
+		Message:   "Job started",
+		CreatedAt: time.Now(),
+	}
+	logChan <- l
+}
+
+func setJobWaiting(job dao.Job) {
+	status[job.JobId].Mu.Lock()
+	status[job.JobId].Status = JobWaiting
+	status[job.JobId].LastUpdated = time.Now()
+	status[job.JobId].Mu.Unlock()
+	log.Info(fmt.Sprintf("JobID: %d has succeded, sleeping %d seconds", job.JobId, job.Interval))
+	l := dao.Log{
+		JobId:     job.JobId,
+		Status:    JobWaiting,
+		Message:   "Job finished, sleeping",
+		CreatedAt: time.Now(),
+	}
+	logChan <- l
+}
+
+func setJobError(jobId uint64, err error) {
+	status[jobId].Mu.Lock()
+	status[jobId].Status = JobError
+	status[jobId].LastUpdated = time.Now()
+	status[jobId].Mu.Unlock()
+	log.Error(fmt.Sprintf("JobID: %d has failed with error: %s", jobId, err))
+	l := dao.Log{
+		JobId:     jobId,
+		Status:    JobError,
+		Message:   "Job finished, sleeping",
+		CreatedAt: time.Now(),
+	}
+	logChan <- l
+}
+
+func NotifyNewJob(job dao.Job) {
+	newJobChan <- job
+}
+
+func NotifyDeletedJob(jobId uint64){
+	deletedJobChan <- jobId
+}
+
+func intInSlice(a uint64, list []dao.Job) bool {
 	for _, b := range list {
 		if b.JobId == a {
 			return true

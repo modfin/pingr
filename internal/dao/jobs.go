@@ -9,10 +9,10 @@ func GetJobs(db *sql.DB) ([]Job, error) {
 		SELECT * FROM jobs
 	`
 	rows, err := db.Query(q)
+	defer rows.Close()
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
 	var jobs []Job
 	for rows.Next() {
@@ -30,15 +30,15 @@ func GetJobs(db *sql.DB) ([]Job, error) {
 	return jobs, nil
 }
 
-func GetJob(id string, db *sql.DB) (j Job, err error) {
+func GetJob(id uint64, db *sql.DB) (j Job, err error) {
 	q := `
 		SELECT * FROM jobs WHERE job_id = ?
 	`
 	stmt, err := db.Prepare(q)
+	defer stmt.Close()
 	if err != nil {
 		return
 	}
-	defer stmt.Close()
 
 	err = stmt.QueryRow(id).Scan(&j.JobId, &j.TestType, &j.Url, &j.Interval, &j.Timeout, &j.CreatedAt)
 	if err != nil {
@@ -47,22 +47,22 @@ func GetJob(id string, db *sql.DB) (j Job, err error) {
 	return
 }
 
-func GetJobLogs(id string, db *sql.DB) ([]Log, error) {
+func GetJobLogs(id uint64, db *sql.DB) ([]Log, error) {
 	q := `
 		SELECT * FROM logs WHERE job_id = ?
 	`
 
 	stmt, err := db.Prepare(q)
+	defer stmt.Close()
 	if err != nil {
 		return nil, err
 	}
-	defer stmt.Close()
 
 	rows, err := stmt.Query(id)
+	defer rows.Close()
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
 	var logs []Log
 	for rows.Next() {
@@ -80,35 +80,41 @@ func GetJobLogs(id string, db *sql.DB) ([]Log, error) {
 	return logs, nil
 }
 
-func PostJob(job Job, db *sql.DB) error {
+func PostJob(job Job, db *sql.DB) (_job Job, err error) {
 	q := `
 		INSERT INTO jobs(test_type, url, interval, timeout, created_at) values(?,?,?,?,?);
 	`
 	tx, err := db.Begin()
+	defer tx.Rollback()
 	if err != nil {
-		return err
+		return
 	}
 
 	stmt, err := tx.Prepare(q)
-	if err != nil {
-		return err
-	}
 	defer stmt.Close()
-
-	_, err = stmt.Exec(job.TestType, job.Url, job.Interval, job.Timeout, job.CreatedAt)
 	if err != nil {
-		return err
+		return
+	}
+
+	res, err := stmt.Exec(job.TestType, job.Url, job.Interval, job.Timeout, job.CreatedAt)
+	if err != nil {
+		return
 	}
 
 	err = tx.Commit()
 	if err != nil {
-		return err
+		return
 	}
-
-	return nil
+	jobId, err := res.LastInsertId()
+	if err != nil {
+		return
+	}
+	job.JobId = uint64(jobId)
+	_job = job
+	return
 }
 
-func PutJob(job Job,  db *sql.DB)  error {
+func PutJob(job Job,  db *sql.DB)  (_job Job, err error) {
 	q := `
 		UPDATE jobs 
 		SET test_type = ?,
@@ -119,44 +125,46 @@ func PutJob(job Job,  db *sql.DB)  error {
 		WHERE job_id = ?
 	`
 	tx, err := db.Begin()
+	defer tx.Rollback()
 	if err != nil {
-		return err
+		return
 	}
 
 	stmt, err := tx.Prepare(q)
-	if err != nil {
-		return err
-	}
 	defer stmt.Close()
+	if err != nil {
+		return
+	}
 
 	_, err = stmt.Exec(job.TestType, job.Url, job.Interval, job.Timeout, job.CreatedAt, job.JobId)
 	if err != nil {
-		return err
+		return
 	}
 
 	err = tx.Commit()
 	if err != nil {
-		return err
+		return
 	}
-
-	return nil
+	_job = job
+	return
 }
 
-func DeleteJob(id string,  db *sql.DB) error {
+func DeleteJob(id uint64,  db *sql.DB) error {
 	q := `
 		DELETE FROM jobs 
 		WHERE job_id = ?
 	`
 	tx, err := db.Begin()
+	defer tx.Rollback()
 	if err != nil {
 		return err
 	}
 
 	stmt, err := tx.Prepare(q)
+	defer stmt.Close()
 	if err != nil {
 		return err
 	}
-	defer stmt.Close()
 
 	_, err = stmt.Exec(id)
 	if err != nil {

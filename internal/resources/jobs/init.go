@@ -5,6 +5,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"pingr/internal/dao"
 	"pingr/internal/scheduler"
+	"strconv"
 	"time"
 )
 
@@ -22,11 +23,16 @@ func Init(g *echo.Group) {
 	})
 
 	// Get a Job
-	g.GET("/:JobId", func(context echo.Context) error {
+	g.GET("/:jobId", func(context echo.Context) error {
 		db := context.Get("DB").(*sql.DB)
-		JobId:= context.Param("JobId")
+		jobIdString:= context.Param("jobId")
 
-		job, err := dao.GetJob(JobId, db)
+		jobId, err := strconv.ParseUint(jobIdString, 10, 64)
+		if err != nil {
+			return context.String(500, "Could not parse JobId as int")
+		}
+
+		job, err := dao.GetJob(jobId, db)
 		if err != nil {
 			return context.String(500, "Failed to get job, " + err.Error())
 		}
@@ -35,10 +41,16 @@ func Init(g *echo.Group) {
 	})
 
 	// Get a Job's Logs
-	g.GET("/:JobId/logs", func(context echo.Context) error {
+	g.GET("/:jobId/logs", func(context echo.Context) error {
 		db := context.Get("DB").(*sql.DB)
-		JobId:= context.Param("JobId")
-		logs, err := dao.GetJobLogs(JobId, db)
+		jobIdString:= context.Param("jobId")
+
+		jobId, err := strconv.ParseUint(jobIdString, 10, 64)
+		if err != nil {
+			return context.String(500, "Could not parse JobId as int")
+		}
+
+		logs, err := dao.GetJobLogs(jobId, db)
 		if err != nil {
 			return context.String(500, "Failed to get the job's logs, " + err.Error())
 		}
@@ -51,20 +63,18 @@ func Init(g *echo.Group) {
 		if err := context.Bind(&job); err != nil {
 			return context.String(500, "Could not parse body as job type")
 		}
-
-		t, err := time.Parse(time.RFC3339, context.FormValue("CreatedAt"))
-		if err != nil {
-			return context.String(500, "Could not parse CreatedAt as Time")
+		if !job.Validate(false) {
+			return context.String(500, "Input invalid")
 		}
-		job.CreatedAt = t
+		job.CreatedAt = time.Now()
 
 		db := context.Get("DB").(*sql.DB)
-		err = dao.PostJob(job, db)
+		job, err := dao.PostJob(job, db)
 		if err != nil {
 			return context.String(500, "Could not add Job to DB, " +  err.Error())
 		}
 
-		scheduler.Notify()
+		scheduler.NotifyNewJob(job)
 
 		return context.String(200, "Job added to DB")
 	})
@@ -75,39 +85,48 @@ func Init(g *echo.Group) {
 		if err := context.Bind(&job); err != nil {
 			return context.String(500, "Could not parse body as job type")
 		}
-
-		t, err := time.Parse(time.RFC3339, context.FormValue("CreatedAt"))
-		if err != nil {
-			return context.String(500, "Could not parse CreatedAt as Time")
+		if !job.Validate(true) {
+			return context.String(500, "Input invalid")
 		}
-		job.CreatedAt = t
-
+		job.CreatedAt = time.Now()
 		db := context.Get("DB").(*sql.DB)
-		err = dao.PutJob(job, db)
+		_, err := dao.GetJob(job.JobId, db)
+		if err != nil {
+			return context.String(500, "Not a valid/active jobId, " + err.Error())
+		}
+
+		job, err = dao.PutJob(job, db)
 		if err != nil {
 			return context.String(500, "Could not update Job, " + err.Error())
 		}
 
-		scheduler.Notify()
+		scheduler.NotifyNewJob(job)
 
 		return context.JSON(200, job)
 	})
 
 	// Delete Job
 	g.DELETE("/delete/:jobId", func(context echo.Context) error {
-		jobId := context.Param("jobId")
-		if jobId == "" {
-			return context.String(500, "Please include jobId in body")
-		}
+		jobIdString:= context.Param("jobId")
 
-		db := context.Get("DB").(*sql.DB)
-		err := dao.DeleteJob(jobId, db)
+		jobId, err := strconv.ParseUint(jobIdString, 10, 64)
 		if err != nil {
-			context.String(500, "Could not delete Job, " + err.Error())
+			return context.String(500, "Could not parse jobId as int")
+		}
+		db := context.Get("DB").(*sql.DB)
+		_, err = dao.GetJob(jobId, db)
+		if err != nil {
+			return context.String(500, "Not a valid/active jobId, " + err.Error())
 		}
 
-		scheduler.Notify()
+		err = dao.DeleteJob(jobId, db)
+		if err != nil {
+			return context.String(500, "Could not delete Job, " + err.Error())
+		}
+
+		scheduler.NotifyDeletedJob(jobId)
 
 		return context.String(500, "Job deleted")
 	})
+
 }

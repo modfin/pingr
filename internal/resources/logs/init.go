@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"github.com/labstack/echo/v4"
 	"pingr/internal/dao"
-	"pingr/internal/scheduler"
+	"strconv"
 )
 
 func Init(g *echo.Group) {
@@ -21,11 +21,16 @@ func Init(g *echo.Group) {
 	})
 
 	// Get a Log
-	g.GET("/:LogId", func(context echo.Context) error {
+	g.GET("/:logId", func(context echo.Context) error {
 		db := context.Get("DB").(*sql.DB)
-		LogId := context.Param("LogId")
+		logIdString:= context.Param("logId")
 
-		log, err := dao.GetLog(LogId, db)
+		logId, err := strconv.ParseUint(logIdString, 10, 64)
+		if err != nil {
+			return context.String(500, "Could not parse JobId as int")
+		}
+
+		log, err := dao.GetLog(logId, db)
 		if err != nil {
 			return context.String(500, "Failed to get log, " + err.Error())
 		}
@@ -34,19 +39,23 @@ func Init(g *echo.Group) {
 	})
 
 	// Delete a log
-	g.DELETE("/delete", func(context echo.Context) error {
-		logId := context.FormValue("logId")
-		if logId == "" {
+	g.DELETE("/delete/:logId", func(context echo.Context) error {
+		logIdString:= context.Param("logId")
+		if logIdString == "" {
 			return context.String(500, "Please include logId in body")
 		}
 
+		logId, err := strconv.ParseUint(logIdString, 10, 64)
+		if err != nil {
+			return context.String(500, "Could not parse JobId as int")
+		}
+
+
 		db := context.Get("DB").(*sql.DB)
-		err := dao.DeleteLog(logId, db)
+		err = dao.DeleteLog(logId, db)
 		if err != nil {
 			context.String(500, "Could not delete Log, " + err.Error())
 		}
-
-		scheduler.Notify()
 
 		return context.String(500, "Log deleted")
 	})
