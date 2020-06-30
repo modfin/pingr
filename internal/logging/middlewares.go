@@ -2,8 +2,8 @@ package logging
 
 import (
 	"context"
-	"database/sql"
 	"github.com/google/uuid"
+	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/sirupsen/logrus"
@@ -38,7 +38,7 @@ func EchoMiddleware(skipper middleware.Skipper) echo.MiddlewareFunc {
 			entry = entry.WithField("uri", req.RequestURI)
 			entry = entry.WithField("method", req.Method)
 			entry = entry.WithField("host", req.Host)
-			entry = entry.WithField("Status", res.Status)
+			entry = entry.WithField("status", res.Status)
 
 			if err != nil {
 				entry.Error()
@@ -80,7 +80,7 @@ func RequestIdMiddleware() echo.MiddlewareFunc {
 	}
 }
 
-func GetDBMiddleware(db *sql.DB) echo.MiddlewareFunc {
+func GetDBMiddleware(db *sqlx.DB) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) (err error) {
 			c.Set("DB", db)

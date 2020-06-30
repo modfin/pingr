@@ -1,7 +1,7 @@
 package logs
 
 import (
-	"database/sql"
+	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo/v4"
 	"pingr/internal/dao"
 	"strconv"
@@ -10,7 +10,7 @@ import (
 func Init(g *echo.Group) {
 	// Get all Logs
 	g.GET("", func(context echo.Context) error {
-		db := context.Get("DB").(*sql.DB)
+		db := context.Get("DB").(*sqlx.DB)
 
 		logs, err := dao.GetLogs(db)
 		if err != nil {
@@ -22,7 +22,7 @@ func Init(g *echo.Group) {
 
 	// Get a Log
 	g.GET("/:logId", func(context echo.Context) error {
-		db := context.Get("DB").(*sql.DB)
+		db := context.Get("DB").(*sqlx.DB)
 		logIdString:= context.Param("logId")
 
 		logId, err := strconv.ParseUint(logIdString, 10, 64)
@@ -51,7 +51,7 @@ func Init(g *echo.Group) {
 		}
 
 
-		db := context.Get("DB").(*sql.DB)
+		db := context.Get("DB").(*sqlx.DB)
 		err = dao.DeleteLog(logId, db)
 		if err != nil {
 			context.String(500, "Could not delete Log, " + err.Error())

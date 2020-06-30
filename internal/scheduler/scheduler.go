@@ -1,17 +1,18 @@
 package scheduler
 
 import (
-	"database/sql"
 	"fmt"
+	"github.com/jmoiron/sqlx"
 	log "github.com/sirupsen/logrus"
+	"pingr"
 	"pingr/internal/dao"
-	"pingr/internal/poll"
+	"reflect"
 	"sync"
 	"time"
 )
 
 const (
-	JobTimeoutCheckInterval = 1 * time.Minute
+	JobTimeoutCheckInterval = 1 * time.Minute // Put in config?
 	DataBaseListenerInterval = 10 * time.Minute
 
 	JobInitialized = 1
@@ -23,27 +24,27 @@ const (
 )
 
 var (
-	jobs = make(map[uint64] dao.Job)
+	jobs = make(map[uint64] pingr.Job)
 	status = make(map[uint64]*jobStatus)
 
-	logChan = make(chan dao.Log, 100)
-	newJobChan = make(chan dao.Job, 10)
+	logChan = make(chan pingr.Log, 100)
+	newJobChan = make(chan pingr.Job, 10)
 	deletedJobChan = make(chan uint64, 10)
+	notifyDBHandler = make(chan int, 10)
 
     muJobs sync.RWMutex
 )
 
 type jobStatus struct {
+	Mu 			sync.RWMutex
+
 	Status 		int
 	CloseChan	chan int
 	LastUpdated	time.Time
 	Timeout 	time.Duration
-	Mu 			sync.RWMutex
 }
 
-func Scheduler(db *sql.DB) error {
-	log.Info("Starting scheduler")
-
+func Scheduler(db *sqlx.DB) error {
 	go logger(db)
 
 	initVars(db)
@@ -55,17 +56,16 @@ func Scheduler(db *sql.DB) error {
 	for {
 		select {
 			case newJob := <- newJobChan:
-				// New/updated job has to be processed
 				muJobs.Lock()
-				jobs[newJob.JobId] = newJob
+				jobs[newJob.Get().JobId] = newJob
 
-				if _, ok := status[newJob.JobId]; !ok {
+				if _, ok := status[newJob.Get().JobId]; !ok {
 					// New job
 					closeChan := make(chan int)
 					setNewJobInitialized(newJob, closeChan)
-					go worker(newJob.JobId, closeChan)
+					go worker(newJob.Get().JobId, closeChan)
 				} else {
-					setUpdatedJobInitialized(newJob.JobId)
+					setUpdatedJobInitialized(newJob.Get().JobId)
 				}
 				muJobs.Unlock()
 
@@ -79,7 +79,7 @@ func Scheduler(db *sql.DB) error {
 				if _, ok := jobs[deletedJobId]; ok {
 					delete(jobs, deletedJobId)
 					log.Info(fmt.Sprintf("JobID: %d, Job closed", deletedJobId))
-					l := dao.Log{
+					l := pingr.Log{
 						JobId:     deletedJobId,
 						Status:    JobClosed,
 						Message:   "Job closed",
@@ -97,27 +97,19 @@ func worker(jobId uint64, close chan int) {
 		muJobs.RLock()
 		job, ok := jobs[jobId]
 		if !ok {
+			// Job deleted?
 			muJobs.RUnlock()
 			return
 		}
-
-		_, ok = status[jobId]
-		if !ok {
-			muJobs.RUnlock()
-			return
-		}
+		muJobs.RUnlock()
 
 		setJobRunning(job)
 
-		var err error
-		switch job.TestType {
-		case "TLS":
-			err = poll.TLS(job.Url, "HTTPS")
-		}
+		_, err := job.RunTest()
 
 		muJobs.RLock()
-		_, ok = status[jobId]
-		if !ok {
+
+		if _, ok = status[jobId]; !ok {
 			// Has the job been deleted while it was running?
 			muJobs.RUnlock()
 			return
@@ -132,14 +124,14 @@ func worker(jobId uint64, close chan int) {
 		muJobs.RUnlock()
 
 		select {
-		case <-time.After(job.Interval * time.Second):
+		case <-time.After(job.Get().Interval * time.Second):
 		case <-close:
 			return
 		}
 	}
 }
 
-func logger(db *sql.DB) {
+func logger(db *sqlx.DB) {
 	for {
 		select {
 		case l := <-logChan:
@@ -170,77 +162,80 @@ func jobTimeoutHandler() {
 	}
 }
 
-func dataBaseListener(db *sql.DB) {
+func dataBaseListener(db *sqlx.DB) {
 	for {
 		select {
 			case <-time.After(DataBaseListenerInterval):
-				log.Info("Looking for new/updated jobs in DB")
-				jobsDB, err := dao.GetJobs(db)
-				if err != nil {
-					continue // Bad
-				}
-
-				newJobs := make([]dao.Job, 0)
-				deletedJobs := make([]uint64, 0)
-
-				// Look for new/updated job
-				muJobs.RLock()
-				for _, j := range jobsDB {
-					if jobs[j.JobId] != j { // Found a new/updated job
-						newJobs = append(newJobs, j)
-					}
-				}
-
-				// Look for deleted jobs
-				for jobId := range jobs {
-					// slow but probably okay since user wont update/add
-					if !intInSlice(jobId, jobsDB) {
-						deletedJobs = append(deletedJobs, jobId)
-					}
-				}
-				muJobs.RUnlock()
-
-				// Save result in array and send on channel after Unlock to avoid deadlock
-				for _, newJob := range newJobs {
-					newJobChan <- newJob
-				}
-				for _, jobId := range deletedJobs {
-					deletedJobChan <- jobId
-				}
+			case <-notifyDBHandler:
 		}
+		log.Info("Looking for new/updated jobs in DB")
+		jobsDB, err := dao.GetJobs(db)
+		if err != nil {
+			continue // Bad
+		}
+
+		var newJobs [] pingr.Job
+		var deletedJobs []uint64
+
+		// Look for new/updated job
+		muJobs.RLock()
+		for _, j := range jobsDB {
+			if !reflect.DeepEqual(jobs[j.Get().JobId], j) { // Found a new/updated job
+				newJobs = append(newJobs, j)
+			}
+		}
+
+		// Look for deleted jobs
+		for jobId := range jobs {
+			// slow but probably okay since user wont update/add
+			if !intInSlice(jobId, jobsDB) {
+				deletedJobs = append(deletedJobs, jobId)
+			}
+		}
+		muJobs.RUnlock()
+
+		// Save result in array and send on channel after Unlock to avoid deadlock
+		for _, newJob := range newJobs {
+			newJobChan <- newJob
+		}
+		for _, jobId := range deletedJobs {
+			deletedJobChan <- jobId
+		}
+
 	}
 }
 
-func initVars(db *sql.DB) {
+func initVars(db *sqlx.DB) {
 	jobsDB, err := dao.GetJobs(db)
 	if err != nil {
 		log.Warn(err)
 	}
 
 	muJobs.Lock()
+	defer muJobs.Unlock()
+
 	for _, job := range jobsDB {
-		jobs[job.JobId] = job
+		jobs[job.Get().JobId] = job
 
 		closeChan := make(chan int)
 		setNewJobInitialized(job, closeChan)
 
-		go worker(job.JobId, closeChan)
+		go worker(job.Get().JobId, closeChan)
 	}
-	muJobs.Unlock()
 }
 
-func setNewJobInitialized(job dao.Job, closeChan chan int) {
+func setNewJobInitialized(job pingr.Job, closeChan chan int) {
 	jStatus := jobStatus{
 		Status:      JobInitialized,
 		CloseChan:	 closeChan,
 		LastUpdated: time.Now(),
-		Timeout:     job.Timeout,
+		Timeout:     job.Get().Timeout,
 	}
-	status[job.JobId] = &jStatus
+	status[job.Get().JobId] = &jStatus
 
-	log.Info(fmt.Sprintf("JobID: %d, Initialized", job.JobId))
-	l := dao.Log{
-		JobId:     job.JobId,
+	log.Info(fmt.Sprintf("JobID: %d, Initialized", job.Get().JobId))
+	l := pingr.Log{
+		JobId:     job.Get().JobId,
 		Status:    JobInitialized,
 		Message:   "New/Updated job has been initialized.",
 		CreatedAt: time.Now(),
@@ -249,11 +244,14 @@ func setNewJobInitialized(job dao.Job, closeChan chan int) {
 }
 
 func setUpdatedJobInitialized(jobId uint64) {
+	status[jobId].Mu.Lock()
+	defer status[jobId].Mu.Unlock()
+
 	status[jobId].LastUpdated = time.Now()
 	status[jobId].Status = JobInitialized
 
 	log.Info(fmt.Sprintf("JobID: %d, Initialized", jobId))
-	l := dao.Log{
+	l := pingr.Log{
 		JobId:     jobId,
 		Status:    JobInitialized,
 		Message:   "New/Updated job has been initialized.",
@@ -262,16 +260,16 @@ func setUpdatedJobInitialized(jobId uint64) {
 	logChan <- l
 }
 
-func setJobRunning(job dao.Job) {
-	status[job.JobId].Mu.Lock()
-	status[job.JobId].Status = JobRunning
-	status[job.JobId].LastUpdated = time.Now()
-	status[job.JobId].Mu.Unlock()
-	muJobs.RUnlock()
+func setJobRunning(job pingr.Job) {
+	status[job.Get().JobId].Mu.Lock()
+	defer status[job.Get().JobId].Mu.Unlock()
 
-	log.Info(fmt.Sprintf("Starting job. JobID: %d Type: %s", job.JobId, job.TestType))
-	l := dao.Log{
-		JobId:     job.JobId,
+	status[job.Get().JobId].Status = JobRunning
+	status[job.Get().JobId].LastUpdated = time.Now()
+
+	log.Info(fmt.Sprintf("JobID: %d started, Type: %s", job.Get().JobId, job.Get().TestType))
+	l := pingr.Log{
+		JobId:     job.Get().JobId,
 		Status:    JobRunning,
 		Message:   "Job started",
 		CreatedAt: time.Now(),
@@ -279,14 +277,16 @@ func setJobRunning(job dao.Job) {
 	logChan <- l
 }
 
-func setJobWaiting(job dao.Job) {
-	status[job.JobId].Mu.Lock()
-	status[job.JobId].Status = JobWaiting
-	status[job.JobId].LastUpdated = time.Now()
-	status[job.JobId].Mu.Unlock()
-	log.Info(fmt.Sprintf("JobID: %d has succeded, sleeping %d seconds", job.JobId, job.Interval))
-	l := dao.Log{
-		JobId:     job.JobId,
+func setJobWaiting(job pingr.Job) {
+	status[job.Get().JobId].Mu.Lock()
+	defer status[job.Get().JobId].Mu.Unlock()
+
+	status[job.Get().JobId].Status = JobWaiting
+	status[job.Get().JobId].LastUpdated = time.Now()
+
+	log.Info(fmt.Sprintf("JobID: %d has succeded, sleeping %d seconds", job.Get().JobId, job.Get().Interval))
+	l := pingr.Log{
+		JobId:     job.Get().JobId,
 		Status:    JobWaiting,
 		Message:   "Job finished, sleeping",
 		CreatedAt: time.Now(),
@@ -296,11 +296,13 @@ func setJobWaiting(job dao.Job) {
 
 func setJobError(jobId uint64, err error) {
 	status[jobId].Mu.Lock()
+	defer status[jobId].Mu.Unlock()
+
 	status[jobId].Status = JobError
 	status[jobId].LastUpdated = time.Now()
-	status[jobId].Mu.Unlock()
+
 	log.Error(fmt.Sprintf("JobID: %d has failed with error: %s", jobId, err))
-	l := dao.Log{
+	l := pingr.Log{
 		JobId:     jobId,
 		Status:    JobError,
 		Message:   "Job finished, sleeping",
@@ -309,17 +311,17 @@ func setJobError(jobId uint64, err error) {
 	logChan <- l
 }
 
-func NotifyNewJob(job dao.Job) {
-	newJobChan <- job
+func NotifyNewJob() {
+	notifyDBHandler <- 1
 }
 
 func NotifyDeletedJob(jobId uint64){
 	deletedJobChan <- jobId
 }
 
-func intInSlice(a uint64, list []dao.Job) bool {
+func intInSlice(a uint64, list []pingr.Job) bool {
 	for _, b := range list {
-		if b.JobId == a {
+		if b.Get().JobId == a {
 			return true
 		}
 	}

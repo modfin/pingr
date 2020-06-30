@@ -13,7 +13,7 @@ func SetMetrics(e *echo.Echo) {
 
 func Init(closing <-chan struct{}, g *echo.Group) {
 
-	g.GET("/poll", func(context echo.Context) error {
+	g.GET("/ping", func(context echo.Context) error {
 		return context.String(200, "pong")
 	})
 }

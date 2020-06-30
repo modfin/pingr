@@ -1,12 +1,12 @@
 package dao
 
 import (
-	"database/sql"
 	"github.com/gchaincl/dotsql"
+	"github.com/jmoiron/sqlx"
 	"os"
 )
 
-func InitDB() (*sql.DB, error) {
+func InitDB() (*sqlx.DB, error) {
 	if !fileExists("data.db") {
 		file, err := os.Create("data.db")
 		if err != nil {
@@ -15,7 +15,7 @@ func InitDB() (*sql.DB, error) {
 		file.Close()
 	}
 
-	db, err := sql.Open("sqlite3", "data.db")
+	db, err := sqlx.Open("sqlite3", "data.db")
 	if err != nil {
 		return nil, err
 	}
@@ -28,7 +28,7 @@ func InitDB() (*sql.DB, error) {
 	return db, nil
 }
 
-func setupTables(db *sql.DB) error {
+func setupTables(db *sqlx.DB) error {
 	dot, err := dotsql.LoadFromFile("./_schema/001.tables.up.sql")
 	if err != nil {
 		return err

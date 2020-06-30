@@ -2,8 +2,8 @@ package resources
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
+	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/sirupsen/logrus"
@@ -14,7 +14,7 @@ import (
 	"pingr/internal/resources/logs"
 )
 
-func Init(closing <-chan struct{}, db *sql.DB) {
+func Init(closing <-chan struct{}, db *sqlx.DB) {
 
 	e := echo.New()
 	e.Use(logging.RequestIdMiddleware())

@@ -1,177 +1,154 @@
 package dao
 
 import (
-	"database/sql"
+	"encoding/json"
+	"errors"
+	"github.com/jmoiron/sqlx"
+	"pingr"
 )
 
-func GetJobs(db *sql.DB) ([]Job, error) {
+
+type Job struct {
+	pingr.BaseJob
+	Blob []byte `json:"blob" db:"blob"`
+}
+
+func (j Job) Parse() (parsedJob pingr.Job, err error) {
+	switch j.TestType {
+	case "SSH":
+		var t pingr.SSHTest
+		t.BaseJob = j.BaseJob
+		err = json.Unmarshal(j.Blob, &t)
+		if err != nil {
+			return
+		}
+		parsedJob = t
+	case "TCP":
+		var t pingr.TCPTest
+		t.BaseJob = j.BaseJob
+		err = json.Unmarshal(j.Blob, &t)
+		if err != nil {
+			return
+		}
+		parsedJob = t
+	case "TLS":
+		var t pingr.TLSTest
+		t.BaseJob = j.BaseJob
+		err = json.Unmarshal(j.Blob, &t)
+		if err != nil {
+			return
+		}
+		parsedJob = t
+	case "Ping":
+		var t pingr.PingTest
+		t.BaseJob = j.BaseJob
+		err = json.Unmarshal(j.Blob, &t)
+		if err != nil {
+			return
+		}
+		parsedJob = t
+	case "HTTP":
+		var t pingr.HTTPTest
+		t.BaseJob = j.BaseJob
+		err = json.Unmarshal(j.Blob, &t)
+		if err != nil {
+			return
+		}
+		parsedJob = t
+	default:
+		err = errors.New(j.TestType + " is not a vaild test type")
+	}
+	return
+}
+
+func GetJobs(db *sqlx.DB) ([]pingr.Job, error) {
 	q := `
 		SELECT * FROM jobs
 	`
-	rows, err := db.Query(q)
-	defer rows.Close()
+	var jobs []Job
+	err := db.Select(&jobs, q)
 	if err != nil {
 		return nil, err
 	}
 
-	var jobs []Job
-	for rows.Next() {
-		var j Job
-		err := rows.Scan(&j.JobId, &j.TestType, &j.Url, &j.Interval, &j.Timeout, &j.CreatedAt)
+	var parsedJobs []pingr.Job
+	for _, j := range jobs {
+		pJob, err := j.Parse()
 		if err != nil {
 			return nil, err
 		}
-		jobs = append(jobs, j)
+		parsedJobs = append(parsedJobs, pJob)
 	}
-	err = rows.Err()
-	if err != nil {
-		return nil, err
-	}
-	return jobs, nil
+
+	return parsedJobs, nil
 }
 
-func GetJob(id uint64, db *sql.DB) (j Job, err error) {
+func GetJob(id uint64, db *sqlx.DB) (_job pingr.Job, err error) {
 	q := `
-		SELECT * FROM jobs WHERE job_id = ?
+		SELECT * FROM jobs WHERE job_id = $1
 	`
-	stmt, err := db.Prepare(q)
-	defer stmt.Close()
+	var j Job
+	err = db.Get(&j, q, id)
 	if err != nil {
 		return
 	}
 
-	err = stmt.QueryRow(id).Scan(&j.JobId, &j.TestType, &j.Url, &j.Interval, &j.Timeout, &j.CreatedAt)
-	if err != nil {
-		return
-	}
+	_job, err = j.Parse()
 	return
 }
 
-func GetJobLogs(id uint64, db *sql.DB) ([]Log, error) {
+func GetJobLogs(id uint64, db *sqlx.DB) ([]pingr.Log, error) {
 	q := `
-		SELECT * FROM logs WHERE job_id = ?
+		SELECT * FROM logs WHERE job_id = $1
 	`
+	var logs []pingr.Log
 
-	stmt, err := db.Prepare(q)
-	defer stmt.Close()
+	err := db.Select(&logs, q, id)
 	if err != nil {
 		return nil, err
 	}
 
-	rows, err := stmt.Query(id)
-	defer rows.Close()
-	if err != nil {
-		return nil, err
-	}
-
-	var logs []Log
-	for rows.Next() {
-		var l Log
-		err := rows.Scan(&l.LogId, &l.JobId, &l.Status, &l.Message, &l.CreatedAt)
-		if err != nil {
-			return nil, err
-		}
-		logs = append(logs, l)
-	}
-	err = rows.Err()
-	if err != nil {
-		return nil, err
-	}
 	return logs, nil
 }
 
-func PostJob(job Job, db *sql.DB) (_job Job, err error) {
+func PostJob(job Job, db *sqlx.DB) error {
 	q := `
-		INSERT INTO jobs(test_type, url, interval, timeout, created_at) values(?,?,?,?,?);
+		INSERT INTO jobs(test_type, url, interval, timeout, created_at, blob) 
+		VALUES (:test_type,:url,:interval,:timeout,:created_at,:blob);
 	`
-	tx, err := db.Begin()
-	defer tx.Rollback()
+	_, err := db.NamedExec(q, job)
 	if err != nil {
-		return
+		return err
 	}
 
-	stmt, err := tx.Prepare(q)
-	defer stmt.Close()
-	if err != nil {
-		return
-	}
-
-	res, err := stmt.Exec(job.TestType, job.Url, job.Interval, job.Timeout, job.CreatedAt)
-	if err != nil {
-		return
-	}
-
-	err = tx.Commit()
-	if err != nil {
-		return
-	}
-	jobId, err := res.LastInsertId()
-	if err != nil {
-		return
-	}
-	job.JobId = uint64(jobId)
-	_job = job
-	return
+	return nil
 }
 
-func PutJob(job Job,  db *sql.DB)  (_job Job, err error) {
+func PutJob(job Job,  db *sqlx.DB)  error {
 	q := `
 		UPDATE jobs 
-		SET test_type = ?,
-			url = ?,
-			interval = ?,
-		    timeout = ?,
-			created_at = ?
-		WHERE job_id = ?
+		SET test_type = :test_type,
+			url = :url,
+			interval = :interval,
+		    timeout = :timeout,
+			created_at = :created_at,
+			blob = :blob
+		WHERE job_id = :job_id
 	`
-	tx, err := db.Begin()
-	defer tx.Rollback()
+	_, err := db.NamedExec(q, job)
 	if err != nil {
-		return
+		return err
 	}
 
-	stmt, err := tx.Prepare(q)
-	defer stmt.Close()
-	if err != nil {
-		return
-	}
-
-	_, err = stmt.Exec(job.TestType, job.Url, job.Interval, job.Timeout, job.CreatedAt, job.JobId)
-	if err != nil {
-		return
-	}
-
-	err = tx.Commit()
-	if err != nil {
-		return
-	}
-	_job = job
-	return
+	return nil
 }
 
-func DeleteJob(id uint64,  db *sql.DB) error {
+func DeleteJob(id uint64,  db *sqlx.DB) error {
 	q := `
 		DELETE FROM jobs 
-		WHERE job_id = ?
+		WHERE job_id = $1
 	`
-	tx, err := db.Begin()
-	defer tx.Rollback()
-	if err != nil {
-		return err
-	}
-
-	stmt, err := tx.Prepare(q)
-	defer stmt.Close()
-	if err != nil {
-		return err
-	}
-
-	_, err = stmt.Exec(id)
-	if err != nil {
-		return err
-	}
-
-	err = tx.Commit()
+	_, err := db.Exec(q, id)
 	if err != nil {
 		return err
 	}

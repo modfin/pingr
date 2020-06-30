@@ -14,7 +14,8 @@ CREATE TABLE IF NOT EXISTS jobs (
     url TEXT NOT NULL,
     interval INTEGER NOT NULL,
     timeout  INTEGER NOT NULL,
-    created_at TIMESTAMP NOT NULL
+    created_at TIMESTAMP NOT NULL,
+    blob BLOB
 );
 
 -- name: create-logs-table
