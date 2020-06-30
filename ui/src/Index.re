@@ -29,7 +29,7 @@ let makeContainer = text => {
 
 // All 4 examples.
 ReactDOMRe.render(
-  <BlinkingGreeting> {React.string("Hello Pingr!")} </BlinkingGreeting>,
+  <BlinkingGreeting> {React.string("Hello Pingr?!")} </BlinkingGreeting>,
   makeContainer("Blinking Greeting"),
 );
 

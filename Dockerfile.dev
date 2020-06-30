@@ -2,7 +2,8 @@ FROM golang:1.13
 
 RUN go get github.com/mattn/go-sqlite3 && \
     go install github.com/mattn/go-sqlite3 &&\
-    go get -u -v github.com/codeskyblue/fswatch
+    go get -u -v github.com/codeskyblue/fswatch &&\
+    go get -u github.com/go-bindata/go-bindata/...
 
 
 
