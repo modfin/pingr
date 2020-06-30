@@ -2,3 +2,8 @@
 .env
 *.db
 *.sqlite
+data.db
+node_modules
+.cache
+ui/lib
+*.bs.js

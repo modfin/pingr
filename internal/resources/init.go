@@ -29,6 +29,11 @@ func Init(closing <-chan struct{}, db *sql.DB) {
 
 	logs.Init(e.Group("logs"))
 
+
+	// UI
+	e.Static("/", "./ui/dist")
+
+
 	// Setup endpoints for SQLite DB? POST/PUT/DELETE Jobs? Get logs of jobs
 
 	// Init scheduler?
