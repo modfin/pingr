@@ -9,7 +9,7 @@ require (
 	github.com/jmoiron/sqlx v1.2.0
 	github.com/labstack/echo-contrib v0.9.0
 	github.com/labstack/echo/v4 v4.1.16
-	github.com/mattn/go-sqlite3 v2.0.3+incompatible // indirect
+	github.com/mattn/go-sqlite3 v2.0.3+incompatible
 	github.com/prometheus/client_golang v1.6.0
 	github.com/sirupsen/logrus v1.6.0
 	github.com/tatsushid/go-fastping v0.0.0-20160109021039-d7bb493dee3e

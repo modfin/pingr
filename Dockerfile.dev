@@ -2,7 +2,8 @@ FROM golang:1.13
 
 RUN go get github.com/mattn/go-sqlite3 && \
     go install github.com/mattn/go-sqlite3 &&\
-    go get -u -v github.com/codeskyblue/fswatch
+    go get -u -v github.com/codeskyblue/fswatch &&\
+    go get -u github.com/go-bindata/go-bindata/...
 
 
 
@@ -33,6 +34,16 @@ watch_depth: 10  \n\
 " > /fsw.yml
 
 
+RUN curl -sL https://deb.nodesource.com/setup_12.x | bash - \
+    && curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add - \
+    && echo "deb https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list \
+    && apt-get update && apt-get install -y nodejs yarn \
+    && yarn global add parcel-bundler && yarn global add bs-platform
+
+
+
+
+
 
 #ARG UID
 #RUN groupadd --gid $UID pingr && useradd --uid $UID --gid pingr --shell /bin/bash --create-home pingr
@@ -41,4 +52,4 @@ watch_depth: 10  \n\
 WORKDIR /go/src/pingr
 
 # run fswatch
-CMD fswatch -config /fsw.yml
+CMD ./start.sh

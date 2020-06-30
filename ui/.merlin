@@ -1,0 +1,20 @@
+####{BSB GENERATED: NO EDIT
+B lib/bs
+FLG -open Pingr
+FLG -ppx '/usr/local/share/.config/yarn/global/node_modules/bs-platform/linux/bsc.exe -as-ppx -bs-jsx 3'
+S /go/src/pingr/ui/node_modules/bs-platform/lib/ocaml
+B /go/src/pingr/ui/node_modules/bs-platform/lib/ocaml
+FLG -w +a-4-9-20-40-41-42-50-61-102
+S /go/src/pingr/ui/node_modules/reason-react/lib/ocaml
+B /go/src/pingr/ui/node_modules/reason-react/lib/ocaml
+S src
+B lib/bs/src
+S src/ReducerFromReactJSDocs
+B lib/bs/src/ReducerFromReactJSDocs
+S src/FetchedDogPictures
+B lib/bs/src/FetchedDogPictures
+S src/BlinkingGreeting
+B lib/bs/src/BlinkingGreeting
+S src/ReasonUsingJSUsingReason
+B lib/bs/src/ReasonUsingJSUsingReason
+####BSB GENERATED: NO EDIT}
