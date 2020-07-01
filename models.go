@@ -31,7 +31,7 @@ func (j BaseJob) Validate(idReq bool) bool {
 type Job interface {
 	RunTest() 		(time.Duration, error)
 	Validate(bool) 	bool
-	Get()			*BaseJob
+	Get()			BaseJob
 }
 
 type BaseJob struct {
@@ -71,8 +71,8 @@ func (t SSHTest) Validate(idReq bool) bool {
 	return true
 }
 
-func (t SSHTest) Get() *BaseJob {
-	return &t.BaseJob
+func (t SSHTest) Get() BaseJob {
+	return t.BaseJob
 }
 
 type TCPTest struct {
@@ -94,8 +94,8 @@ func (t TCPTest) Validate(idReq bool) bool {
 	return true
 }
 
-func (t TCPTest) Get() *BaseJob {
-	return &t.BaseJob
+func (t TCPTest) Get() BaseJob {
+	return t.BaseJob
 }
 
 type TLSTest struct {
@@ -117,8 +117,8 @@ func (t TLSTest) Validate(idReq bool) bool {
 	return true
 }
 
-func (t TLSTest) Get() *BaseJob {
-	return &t.BaseJob
+func (t TLSTest) Get() BaseJob {
+	return t.BaseJob
 }
 
 type PingTest struct {
@@ -136,8 +136,8 @@ func (t PingTest) Validate(idReq bool) bool {
 	return true
 }
 
-func (t PingTest) Get() *BaseJob {
-	return &t.BaseJob
+func (t PingTest) Get() BaseJob {
+	return t.BaseJob
 }
 
 type HTTPTest struct {
@@ -163,6 +163,55 @@ func (t HTTPTest) Validate(idReq bool) bool {
 	return true
 }
 
-func (t HTTPTest) Get() *BaseJob {
-	return &t.BaseJob
+func (t HTTPTest) Get() BaseJob {
+	return t.BaseJob
+}
+
+type DNSTest struct {
+	 IpAddr string 		`json:"ip_addr"`
+	 CNAME	string 		`json:"cname"`
+	 TXT	[]string 	`json:"txt"`
+	 BaseJob
+}
+
+func (t DNSTest) RunTest() (time.Duration, error) {
+	return poll.DNS(t.Url, t.Timeout*time.Second, t.IpAddr, t.CNAME, t.TXT)
+}
+
+func (t DNSTest) Validate(idReq bool) bool {
+	if !t.BaseJob.Validate(idReq) {
+		return false
+	}
+	if len(t.TXT) == 0 && t.CNAME == "" && t.IpAddr == "" { // Has to test something
+		return false
+	}
+	return true
+}
+
+func (t DNSTest) Get() BaseJob {
+	return t.BaseJob
+}
+
+
+type PrometheusTest struct {
+	MetricTests []poll.MetricTest `json:"metric_tests"`
+	BaseJob
+}
+
+func (t PrometheusTest) RunTest() (time.Duration, error) {
+	return poll.Prometheus(t.Url, t.Timeout * time.Second, t.MetricTests)
+}
+
+func (t PrometheusTest) Validate(idReq bool) bool {
+	if !t.BaseJob.Validate(idReq) {
+		return false
+	}
+	/*if len(t.MetricTests) == 0 {
+		return false
+	}*/
+	return true
+}
+
+func (t PrometheusTest) Get() BaseJob {
+	return t.BaseJob
 }

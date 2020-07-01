@@ -6,6 +6,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"pingr"
 	"pingr/internal/dao"
+	"pingr/internal/notifications"
 	"reflect"
 	"sync"
 	"time"
@@ -15,6 +16,7 @@ const (
 	JobTimeoutCheckInterval = 1 * time.Minute // Put in config?
 	DataBaseListenerInterval = 10 * time.Minute
 
+	// Change in DB as well
 	JobInitialized = 1
 	JobRunning = 2
 	JobWaiting = 3
@@ -44,7 +46,7 @@ type jobStatus struct {
 	Timeout 	time.Duration
 }
 
-func Scheduler(db *sqlx.DB) error {
+func Scheduler(db *sqlx.DB) {
 	go logger(db)
 
 	initVars(db)
@@ -63,7 +65,7 @@ func Scheduler(db *sqlx.DB) error {
 					// New job
 					closeChan := make(chan int)
 					setNewJobInitialized(newJob, closeChan)
-					go worker(newJob.Get().JobId, closeChan)
+					go worker(newJob.Get().JobId, closeChan, db)
 				} else {
 					setUpdatedJobInitialized(newJob.Get().JobId)
 				}
@@ -92,7 +94,7 @@ func Scheduler(db *sqlx.DB) error {
 	}
 }
 
-func worker(jobId uint64, close chan int) {
+func worker(jobId uint64, close chan int, db *sqlx.DB) {
 	for {
 		muJobs.RLock()
 		job, ok := jobs[jobId]
@@ -118,6 +120,7 @@ func worker(jobId uint64, close chan int) {
 		if err != nil {
 			// TODO: Handle error better
 			setJobError(jobId, err)
+			notifications.SendEmail(job.Get(), err, db)
 		} else {
 			setJobWaiting(job)
 		}
@@ -144,21 +147,20 @@ func logger(db *sqlx.DB) {
 }
 
 func jobTimeoutHandler() {
-	time.Sleep(JobTimeoutCheckInterval)
 	for {
+		<-time.After(JobTimeoutCheckInterval)
 		log.Info("Checking for timed out jobs")
 		for jobId, jStatus := range status {
+			jStatus.Mu.RLock()
 			if jStatus.Status == JobRunning {
-				jStatus.Mu.RLock()
 				if time.Now().After(jStatus.LastUpdated.Add(time.Second*jStatus.Timeout)) {
 					// Job has timed out
 					// TODO: Handle error better
 					log.Error(fmt.Sprintf("JobID: %d, Timed out", jobId))
 				}
-				jStatus.Mu.RUnlock()
 			}
+			jStatus.Mu.RUnlock()
 		}
-		time.Sleep(JobTimeoutCheckInterval)
 	}
 }
 
@@ -187,7 +189,7 @@ func dataBaseListener(db *sqlx.DB) {
 
 		// Look for deleted jobs
 		for jobId := range jobs {
-			// slow but probably okay since user wont update/add
+			// slow but probably okay since user wont update/add that often
 			if !intInSlice(jobId, jobsDB) {
 				deletedJobs = append(deletedJobs, jobId)
 			}
@@ -220,7 +222,7 @@ func initVars(db *sqlx.DB) {
 		closeChan := make(chan int)
 		setNewJobInitialized(job, closeChan)
 
-		go worker(job.Get().JobId, closeChan)
+		go worker(job.Get().JobId, closeChan, db)
 	}
 }
 

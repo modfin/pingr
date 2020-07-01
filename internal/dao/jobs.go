@@ -13,54 +13,6 @@ type Job struct {
 	Blob []byte `json:"blob" db:"blob"`
 }
 
-func (j Job) Parse() (parsedJob pingr.Job, err error) {
-	switch j.TestType {
-	case "SSH":
-		var t pingr.SSHTest
-		t.BaseJob = j.BaseJob
-		err = json.Unmarshal(j.Blob, &t)
-		if err != nil {
-			return
-		}
-		parsedJob = t
-	case "TCP":
-		var t pingr.TCPTest
-		t.BaseJob = j.BaseJob
-		err = json.Unmarshal(j.Blob, &t)
-		if err != nil {
-			return
-		}
-		parsedJob = t
-	case "TLS":
-		var t pingr.TLSTest
-		t.BaseJob = j.BaseJob
-		err = json.Unmarshal(j.Blob, &t)
-		if err != nil {
-			return
-		}
-		parsedJob = t
-	case "Ping":
-		var t pingr.PingTest
-		t.BaseJob = j.BaseJob
-		err = json.Unmarshal(j.Blob, &t)
-		if err != nil {
-			return
-		}
-		parsedJob = t
-	case "HTTP":
-		var t pingr.HTTPTest
-		t.BaseJob = j.BaseJob
-		err = json.Unmarshal(j.Blob, &t)
-		if err != nil {
-			return
-		}
-		parsedJob = t
-	default:
-		err = errors.New(j.TestType + " is not a vaild test type")
-	}
-	return
-}
-
 func GetJobs(db *sqlx.DB) ([]pingr.Job, error) {
 	q := `
 		SELECT * FROM jobs
@@ -85,7 +37,8 @@ func GetJobs(db *sqlx.DB) ([]pingr.Job, error) {
 
 func GetJob(id uint64, db *sqlx.DB) (_job pingr.Job, err error) {
 	q := `
-		SELECT * FROM jobs WHERE job_id = $1
+		SELECT * FROM jobs 
+		WHERE job_id = $1
 	`
 	var j Job
 	err = db.Get(&j, q, id)
@@ -95,20 +48,6 @@ func GetJob(id uint64, db *sqlx.DB) (_job pingr.Job, err error) {
 
 	_job, err = j.Parse()
 	return
-}
-
-func GetJobLogs(id uint64, db *sqlx.DB) ([]pingr.Log, error) {
-	q := `
-		SELECT * FROM logs WHERE job_id = $1
-	`
-	var logs []pingr.Log
-
-	err := db.Select(&logs, q, id)
-	if err != nil {
-		return nil, err
-	}
-
-	return logs, nil
 }
 
 func PostJob(job Job, db *sqlx.DB) error {
@@ -154,4 +93,68 @@ func DeleteJob(id uint64,  db *sqlx.DB) error {
 	}
 
 	return nil
+}
+
+func (j Job) Parse() (parsedJob pingr.Job, err error) {
+	switch j.TestType {
+	case "SSH":
+		var t pingr.SSHTest
+		t.BaseJob = j.BaseJob
+		err = json.Unmarshal(j.Blob, &t)
+		if err != nil {
+			return
+		}
+		parsedJob = t
+	case "TCP":
+		var t pingr.TCPTest
+		t.BaseJob = j.BaseJob
+		err = json.Unmarshal(j.Blob, &t)
+		if err != nil {
+			return
+		}
+		parsedJob = t
+	case "TLS":
+		var t pingr.TLSTest
+		t.BaseJob = j.BaseJob
+		err = json.Unmarshal(j.Blob, &t)
+		if err != nil {
+			return
+		}
+		parsedJob = t
+	case "Ping":
+		var t pingr.PingTest
+		t.BaseJob = j.BaseJob
+		err = json.Unmarshal(j.Blob, &t)
+		if err != nil {
+			return
+		}
+		parsedJob = t
+	case "HTTP":
+		var t pingr.HTTPTest
+		t.BaseJob = j.BaseJob
+		err = json.Unmarshal(j.Blob, &t)
+		if err != nil {
+			return
+		}
+		parsedJob = t
+	case "DNS":
+		var t pingr.DNSTest
+		t.BaseJob = j.BaseJob
+		err = json.Unmarshal(j.Blob, &t)
+		if err != nil {
+			return
+		}
+		parsedJob = t
+	case "Prometheus":
+		var t pingr.PrometheusTest
+		t.BaseJob = j.BaseJob
+		err = json.Unmarshal(j.Blob, &t)
+		if err != nil {
+			return
+		}
+		parsedJob = t
+	default:
+		err = errors.New(j.TestType + " is not a vaild test type")
+	}
+	return
 }

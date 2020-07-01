@@ -7,10 +7,12 @@ require (
 	github.com/gchaincl/dotsql v1.0.0
 	github.com/google/uuid v1.1.1
 	github.com/jmoiron/sqlx v1.2.0
+	github.com/jordan-wright/email v0.0.0-20200602115436-fd8a7622303e
 	github.com/labstack/echo-contrib v0.9.0
 	github.com/labstack/echo/v4 v4.1.16
 	github.com/mattn/go-sqlite3 v2.0.3+incompatible
 	github.com/prometheus/client_golang v1.6.0
+	github.com/prometheus/common v0.10.0
 	github.com/sirupsen/logrus v1.6.0
 	github.com/tatsushid/go-fastping v0.0.0-20160109021039-d7bb493dee3e
 	golang.org/x/crypto v0.0.0-20200221231518-2aa609cf4a9d

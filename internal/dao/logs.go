@@ -8,6 +8,7 @@ import (
 func GetLogs(db *sqlx.DB) ([]pingr.Log, error) {
 	q := `
 		SELECT * FROM logs
+		ORDER BY created_at DESC 
 	`
 	var logs []pingr.Log
 
@@ -21,7 +22,9 @@ func GetLogs(db *sqlx.DB) ([]pingr.Log, error) {
 
 func GetLog(id uint64, db *sqlx.DB) (l pingr.Log, err error) {
 	q := `
-		SELECT * FROM logs WHERE log_id = $1
+		SELECT * FROM logs 
+		WHERE log_id = $1
+		ORDER BY created_at DESC 
 	`
 
 	err = db.Get(&l, q, id)
@@ -30,6 +33,40 @@ func GetLog(id uint64, db *sqlx.DB) (l pingr.Log, err error) {
 	}
 
 	return
+}
+
+func GetJobLogs(id uint64, db *sqlx.DB) ([]pingr.Log, error) {
+	q := `
+		SELECT * FROM logs 
+		WHERE job_id = $1
+		ORDER BY created_at DESC 
+	`
+	var logs []pingr.Log
+
+	err := db.Select(&logs, q, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return logs, nil
+}
+
+
+func GetJobLogsLimited(id uint64, limit int, db *sqlx.DB) ([]pingr.Log, error) {
+	q := `
+		SELECT * FROM logs
+		WHERE job_id = $1
+		ORDER BY created_at DESC
+		LIMIT $2
+	`
+	var logs []pingr.Log
+
+	err := db.Select(&logs, q, id, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	return logs, nil
 }
 
 func PostLog(log pingr.Log, db *sqlx.DB) error {
