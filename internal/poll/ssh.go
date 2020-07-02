@@ -12,15 +12,15 @@ TODO: Add support for both PublicKey validation with or without password
 TODO: Add support for username and password without and Keys
 TODO: How to read private keys?
 */
-func SSH(hostname string, port string, username string, password string, useKeyPair bool) (rt time.Duration, err error) {
+func SSH(hostname string, port string, username string, password string, useKeyPair bool) (time.Duration, error) {
 	var authMethod ssh.AuthMethod
 
 	if useKeyPair {
 		// Somehow read a key pair
 		var key []byte
-		key, err = ioutil.ReadFile("id_ed25519")
+		key, err := ioutil.ReadFile("id_ed25519")
 		if err != nil {
-			return
+			return 0, err
 		}
 		var signer ssh.Signer
 		if password != "" {
@@ -29,7 +29,7 @@ func SSH(hostname string, port string, username string, password string, useKeyP
 			signer, err = ssh.ParsePrivateKey(key)
 		}
 		if err != nil {
-			return
+			return 0, err
 		}
 		authMethod = ssh.PublicKeys(signer)
 	} else {
@@ -49,16 +49,15 @@ func SSH(hostname string, port string, username string, password string, useKeyP
 							fmt.Sprintf("%s:%s", hostname, port),
 							config)
 	if err != nil {
-		return
+		return time.Since(start), err
 	}
 	defer client.Close()
 
 	session, err := client.NewSession()
 	if err != nil {
-		return
+		return time.Since(start), err
 	}
 	defer session.Close()
-	rt = time.Since(start)
 
-	return
+	return time.Since(start), err
 }

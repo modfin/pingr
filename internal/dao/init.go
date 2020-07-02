@@ -39,11 +39,11 @@ func setupTables(db *sqlx.DB) error {
 		return err
 	}
 
-	_, err = dot.Exec(db, "create-log-status-map-table")
+	_, err = dot.Exec(db, "create-status-map-table")
 	if err != nil {
 		return err
 	}
-	dot.Exec(db, "init-status-mapper") // Will throw error if map table exists
+	_, err = dot.Exec(db, "init-status-mapper") // Will throw error if map table exists
 
 	_, err = dot.Exec(db, "create-contacts-table")
 	if err != nil {
@@ -54,7 +54,6 @@ func setupTables(db *sqlx.DB) error {
 	if err != nil {
 		return err
 	}
-
 
 	_, err = dot.Exec(db, "create-logs-table")
 	if err != nil {

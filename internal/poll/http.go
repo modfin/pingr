@@ -8,30 +8,30 @@ import (
 	"time"
 )
 
-func HTTP(hostname string, method string, to time.Duration, payload []byte, expRes []byte) (rt time.Duration, err error) {
+func HTTP(hostname string, method string, to time.Duration, payload []byte, expRes []byte) (time.Duration, error) {
 	client := http.Client{Timeout: to}
 	start := time.Now()
 	req, err := http.NewRequest(method, hostname, bytes.NewBuffer(payload))
 	if err != nil {
-		return
+		return time.Since(start), err
 	}
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return
+		return time.Since(start), err
 	}
 	defer resp.Body.Close()
-	rt = time.Since(start)
+	rt := time.Since(start)
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return
+		return rt, err
 	}
 
 	if expRes != nil && !bytes.Equal(body, expRes) {
 		err = errors.New("HTTP request response is not matching the expected result")
-		return
+		return rt, err
 	}
 
-	return
+	return rt, err
 }

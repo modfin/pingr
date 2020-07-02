@@ -6,11 +6,12 @@ import (
 )
 
 type Log struct {
-	LogId     uint64	`db:"log_id"`
-	JobId     uint64	`db:"job_id"`
-	Status    int
-	Message   string
-	CreatedAt time.Time	`db:"created_at"`
+	LogId     		uint64			`db:"log_id"`
+	JobId     		uint64			`db:"job_id"`
+	StatusId  		uint			`db:"status_id"`
+	Message   		string
+	ResponseTime 	time.Duration	`db:"response_time"`
+	CreatedAt 		time.Time		`db:"created_at"`
 }
 
 func (j BaseJob) Validate(idReq bool) bool {

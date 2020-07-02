@@ -6,20 +6,19 @@ import (
 	"time"
 )
 
-func TCP(hostname string, port string) (rt time.Duration, err error) {
+func TCP(hostname string, port string) (time.Duration, error) {
 	start := time.Now()
 
 	tcpAddr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("%s:%s", hostname, port))
 	if err != nil {
-		return
+		return time.Since(start), err
 	}
 
 	conn, err := net.DialTCP("tcp", nil, tcpAddr)
 	if err != nil {
-		return
+		return time.Since(start), err
 	}
 	defer conn.Close()
 
-	rt = time.Since(start)
-	return
+	return time.Since(start), err
 }

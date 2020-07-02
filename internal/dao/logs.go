@@ -71,8 +71,8 @@ func GetJobLogsLimited(id uint64, limit int, db *sqlx.DB) ([]pingr.Log, error) {
 
 func PostLog(log pingr.Log, db *sqlx.DB) error {
 	q := `
-		INSERT INTO logs(job_id, status, message, created_at) 
-		VALUES(:job_id,:status,:message,:created_at);
+		INSERT INTO logs(job_id, status_id, message, response_time, created_at) 
+		VALUES(:job_id,:status_id,:message,:response_time,:created_at);
 	`
 	_, err := db.NamedExec(q, log)
 	if err != nil {

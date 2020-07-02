@@ -48,7 +48,7 @@ func DNS(domain string, timeout time.Duration, ipAddrCheck string, cnameCheck st
 		if ipAddrCheck != "" {
 			ips, err := r.LookupHost(context.Background(), domain)
 			if err != nil {
-				return 0, err
+				return time.Since(start), err
 			}
 			ipMatch := false
 			for _, ip := range ips {
@@ -57,7 +57,7 @@ func DNS(domain string, timeout time.Duration, ipAddrCheck string, cnameCheck st
 				}
 			}
 			if !ipMatch {
-				return 0, errors.New(fmt.Sprintf("Expected: %s but got: %s", ipAddrCheck, ips))
+				return time.Since(start), errors.New(fmt.Sprintf("Expected: %s but got: %s", ipAddrCheck, ips))
 			}
 		}
 
@@ -65,10 +65,10 @@ func DNS(domain string, timeout time.Duration, ipAddrCheck string, cnameCheck st
 		if cnameCheck != "" {
 			cname, err := r.LookupCNAME(context.Background(), domain)
 			if err != nil {
-				return 0, err
+				return time.Since(start), err
 			}
 			if cname != cnameCheck {
-				return 0, errors.New(fmt.Sprintf("Expected: %s but got: %s", cnameCheck, cname))
+				return time.Since(start), errors.New(fmt.Sprintf("Expected: %s but got: %s", cnameCheck, cname))
 			}
 		}
 
@@ -76,7 +76,7 @@ func DNS(domain string, timeout time.Duration, ipAddrCheck string, cnameCheck st
 		if txtCheck != nil {
 			txts, err := r.LookupTXT(context.Background(), domain)
 			if err != nil {
-				return 0, err
+				return time.Since(start), err
 			}
 			for _, txtReqValue := range txtCheck {
 				check := false
@@ -86,7 +86,7 @@ func DNS(domain string, timeout time.Duration, ipAddrCheck string, cnameCheck st
 					}
 				}
 				if !check {
-					return 0, errors.New(fmt.Sprintf("Expected TXT to contain: %s got: %s", txtReqValue, txts))
+					return time.Since(start), errors.New(fmt.Sprintf("Expected TXT to contain: %s got: %s", txtReqValue, txts))
 				}
 			}
 		}
