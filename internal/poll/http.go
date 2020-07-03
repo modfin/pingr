@@ -15,7 +15,6 @@ func HTTP(hostname string, method string, to time.Duration, payload []byte, expR
 	if err != nil {
 		return time.Since(start), err
 	}
-
 	resp, err := client.Do(req)
 	if err != nil {
 		return time.Since(start), err

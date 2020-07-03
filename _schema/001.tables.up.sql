@@ -1,6 +1,7 @@
 -- name: create-jobs-table
 CREATE TABLE IF NOT EXISTS jobs (
     job_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    job_name TEXT NOT NULL,
     test_type TEXT CHECK( test_type IN (
                                                 'HTTP',
                                                 'Prometheus',
@@ -42,14 +43,17 @@ CREATE TABLE IF NOT EXISTS status_map (
 -- name: create-contacts-table
 CREATE TABLE IF NOT EXISTS contacts (
     contact_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    contact_name TEXT NOT NULL,
     contact_type TEXT NOT NULL, -- smtp OR endpoint
     contact_url TEXT NOT NULL -- example@gmail.com OR callr.modfin.se
 )
 
 -- name: create-job-contact-mapper
-CREATE TABLE IF NOT EXISTS job_contact (
+CREATE TABLE IF NOT EXISTS job_contacts (
+    job_id INTEGER NOT NULL,
     contact_id INTEGER NOT NULL,
-    job_id INTEGER NOT NULL
+    threshold INTEGER NOT NULL,
+    UNIQUE (contact_id, job_id)
 )
 
 -- name: init-status-mapper
@@ -57,4 +61,6 @@ INSERT INTO status_map(status_id, status_name)
 VALUES
     (1, "Successful"),
     (2, "Error"),
-    (3, "TimedOut");
+    (3, "TimedOut"),
+    (5, "Initialized"),
+    (6, "Deleted");

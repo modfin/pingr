@@ -5,6 +5,11 @@ import (
 	"pingr"
 )
 
+type FullLog struct {
+	pingr.Log
+	StatusName string `db:"status_name"`
+}
+
 func GetLogs(db *sqlx.DB) ([]pingr.Log, error) {
 	q := `
 		SELECT * FROM logs
@@ -52,14 +57,15 @@ func GetJobLogs(id uint64, db *sqlx.DB) ([]pingr.Log, error) {
 }
 
 
-func GetJobLogsLimited(id uint64, limit int, db *sqlx.DB) ([]pingr.Log, error) {
+func GetJobLogsLimited(id uint64, limit int, db *sqlx.DB) ([]FullLog, error) {
 	q := `
-		SELECT * FROM logs
+		SELECT sm.status_name, message, created_at, response_time FROM logs
+		INNER JOIN status_map sm on logs.status_id = sm.status_id
 		WHERE job_id = $1
 		ORDER BY created_at DESC
 		LIMIT $2
 	`
-	var logs []pingr.Log
+	var logs []FullLog
 
 	err := db.Select(&logs, q, id, limit)
 	if err != nil {

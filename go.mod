@@ -6,6 +6,7 @@ require (
 	github.com/caarlos0/env/v6 v6.2.2
 	github.com/gchaincl/dotsql v1.0.0
 	github.com/google/uuid v1.1.1
+	github.com/gosimple/slug v1.9.0
 	github.com/jmoiron/sqlx v1.2.0
 	github.com/jordan-wright/email v0.0.0-20200602115436-fd8a7622303e
 	github.com/labstack/echo-contrib v0.9.0

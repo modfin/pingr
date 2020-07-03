@@ -5,7 +5,7 @@ import (
 )
 
 func TestTLS(t *testing.T) {
-	_, err := TLS("golang.org", "https")
+	_, err := TLS("golang.org", "https", 1)
 	if err != nil{
 		t.Log(err)
 		t.Fail()
@@ -107,7 +107,7 @@ var badTLS = []struct {
 
 func TestBadTLS(t *testing.T){
 	for _, test := range badTLS{
-		_, err := TLS(test.host, test.port)
+		_, err := TLS(test.host, test.port, 1)
 		if err == nil{
 			t.Log("Expected error for", test)
 			t.Fail()

@@ -13,7 +13,9 @@ import (
 	"path/filepath"
 	"pingr/internal/config"
 	"pingr/internal/logging"
+	"pingr/internal/resources/contacts"
 	"pingr/internal/resources/health"
+	"pingr/internal/resources/jobcontacts"
 	"pingr/internal/resources/jobs"
 	"pingr/internal/resources/logs"
 	"pingr/ui"
@@ -31,9 +33,9 @@ func Init(closing <-chan struct{}, db *sqlx.DB) {
 	health.Init(closing, e.Group("health"))
 
 	jobs.Init(e.Group("jobs"))
-
 	logs.Init(e.Group("logs"))
-
+	contacts.Init(e.Group("contacts"))
+	jobcontacts.Init(e.Group("jobcontacts"))
 
 	// UI
 	e.GET("/*", func(c echo.Context) error {
@@ -55,14 +57,6 @@ func Init(closing <-chan struct{}, db *sqlx.DB) {
 		}
 		return c.Blob(200, http.DetectContentType(data), data)
 	})
-
-
-
-	// Setup endpoints for SQLite DB? POST/PUT/DELETE Jobs? Get logs of jobs
-
-	// Init scheduler?
-
-	// Init push?
 
 	go e.Start(fmt.Sprintf(":%d", config.Get().Port))
 

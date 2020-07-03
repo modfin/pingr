@@ -14,12 +14,13 @@ import (
 	"time"
 )
 
-func TLS(hostname string, port string) (time.Duration, error) {
+func TLS(hostname string, port string, timeOut time.Duration) (time.Duration, error) {
 
 	now := time.Now()
 	then := now.AddDate(0, 1, 0)
 
-	netconn, err := net.Dial("tcp", fmt.Sprintf("%s:%s", hostname, port))
+	dialer := net.Dialer{Timeout: timeOut*time.Second}
+	netconn, err := dialer.Dial("tcp", fmt.Sprintf("%s:%s", hostname, port))
 	if err != nil {
 		return time.Since(now), err
 	}

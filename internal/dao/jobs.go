@@ -52,8 +52,8 @@ func GetJob(id uint64, db *sqlx.DB) (_job pingr.Job, err error) {
 
 func PostJob(job Job, db *sqlx.DB) error {
 	q := `
-		INSERT INTO jobs(test_type, url, interval, timeout, created_at, blob) 
-		VALUES (:test_type,:url,:interval,:timeout,:created_at,:blob);
+		INSERT INTO jobs(job_name, test_type, url, interval, timeout, created_at, blob) 
+		VALUES (:job_name,:test_type,:url,:interval,:timeout,:created_at,:blob);
 	`
 	_, err := db.NamedExec(q, job)
 	if err != nil {
@@ -66,7 +66,8 @@ func PostJob(job Job, db *sqlx.DB) error {
 func PutJob(job Job,  db *sqlx.DB)  error {
 	q := `
 		UPDATE jobs 
-		SET test_type = :test_type,
+		SET job_name = :job_name,
+		    test_type = :test_type,
 			url = :url,
 			interval = :interval,
 		    timeout = :timeout,

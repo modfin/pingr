@@ -12,7 +12,7 @@ TODO: Add support for both PublicKey validation with or without password
 TODO: Add support for username and password without and Keys
 TODO: How to read private keys?
 */
-func SSH(hostname string, port string, username string, password string, useKeyPair bool) (time.Duration, error) {
+func SSH(hostname string, port string, timeOut time.Duration, username string, password string, useKeyPair bool) (time.Duration, error) {
 	var authMethod ssh.AuthMethod
 
 	if useKeyPair {
@@ -41,6 +41,7 @@ func SSH(hostname string, port string, username string, password string, useKeyP
 		Auth:              []ssh.AuthMethod{
 			authMethod,
 		},
+		Timeout: timeOut,
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // TODO: Add public key check
 	}
 

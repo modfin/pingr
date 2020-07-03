@@ -29,7 +29,7 @@ func Init(g *echo.Group) {
 
 		jobId, err := strconv.ParseUint(jobIdString, 10, 64)
 		if err != nil {
-			return context.String(500, "Could not parse JobId as int")
+			return context.String(500, "Could not parse JobId as uint")
 		}
 
 		job, err := dao.GetJob(jobId, db)
@@ -47,7 +47,7 @@ func Init(g *echo.Group) {
 
 		jobId, err := strconv.ParseUint(jobIdString, 10, 64)
 		if err != nil {
-			return context.String(500, "Could not parse JobId as int")
+			return context.String(500, "Could not parse JobId as uint")
 		}
 
 		logs, err := dao.GetJobLogs(jobId, db)
@@ -98,7 +98,7 @@ func Init(g *echo.Group) {
 		if err != nil {
 			return err
 		}
-		if !pJob.Validate(false) {
+		if !pJob.Validate(true) {
 			return context.String(500,"invalid input: Job")
 		}
 
@@ -113,7 +113,7 @@ func Init(g *echo.Group) {
 			return context.String(500, "Could not update Job, " + err.Error())
 		}
 
-		scheduler.NotifyNewJob()
+		scheduler.NotifyUpdatedJob(pJob)
 
 		return context.JSON(200, pJob)
 	})
@@ -124,7 +124,7 @@ func Init(g *echo.Group) {
 
 		jobId, err := strconv.ParseUint(jobIdString, 10, 64)
 		if err != nil {
-			return context.String(500, "Could not parse jobId as int")
+			return context.String(500, "Could not parse jobId as uint")
 		}
 		db := context.Get("DB").(*sqlx.DB)
 		_, err = dao.GetJob(jobId, db)
@@ -135,6 +135,11 @@ func Init(g *echo.Group) {
 		err = dao.DeleteJob(jobId, db)
 		if err != nil {
 			return context.String(500, "Could not delete Job, " + err.Error())
+		}
+
+		err = dao.DeleteJobContacts(jobId, db)
+		if err != nil {
+			return context.String(500, "Could not delete the job's contacts: " + err.Error())
 		}
 
 		scheduler.NotifyDeletedJob(jobId)

@@ -14,16 +14,45 @@ type Log struct {
 	CreatedAt 		time.Time		`db:"created_at"`
 }
 
-func (j BaseJob) Validate(idReq bool) bool {
-	if idReq && j.JobId == 0 {return false}
-	switch j.TestType {
-	case "HTTP", "Prometheus", "TLS", "DNS", "Ping", "SSH", "TCP":
+type Contact struct {
+	ContactId 	uint64 `json:"contact_id" db:"contact_id"`
+	ContactName string `json:"contact_name" db:"contact_name"`
+	ContactType string `json:"contact_type" db:"contact_type"`
+	ContactUrl 	string `json:"contact_url" db:"contact_url"`
+}
+
+func (c Contact) Validate(idReq bool) bool {
+	if idReq && c.ContactId == 0 {
+		return false
+	}
+	if c.ContactName == "" {
+		return false
+	}
+	switch c.ContactType {
+	case "smtp", "http":
 	default:
 		return false
 	}
-	if j.Url == "" {return false}
-	if j.Interval == 0 {return false}
-	if j.Timeout == 0 {
+	if c.ContactUrl == "" {
+		return false
+	}
+	return true
+}
+
+type JobContact struct {
+	ContactId 	uint64 	`json:"contact_id" db:"contact_id"`
+	JobId 		uint64 	`json:"job_id" db:"job_id"`
+	Threshold	uint 	`json:"threshold" db:"threshold"`
+}
+
+func (c JobContact) Validate() bool {
+	if c.ContactId == 0 {
+		return false
+	}
+	if c.JobId == 0 {
+		return false
+	}
+	if c.Threshold == 0 {
 		return false
 	}
 	return true
@@ -37,11 +66,30 @@ type Job interface {
 
 type BaseJob struct {
 	JobId		uint64			`json:"job_id" db:"job_id"`
+	JobName		string 			`json:"job_name" db:"job_name"`
 	Url 		string 			`json:"url"`
 	Interval 	time.Duration 	`json:"interval"`
 	Timeout 	time.Duration 	`json:"timeout"`
 	CreatedAt	time.Time		`json:"created_at" db:"created_at"`
 	TestType 	string			`json:"test_type" db:"test_type"`
+}
+
+func (j BaseJob) Validate(idReq bool) bool {
+	if idReq && j.JobId == 0 {return false}
+	if j.JobName == "" {
+		return false
+	}
+	switch j.TestType {
+	case "HTTP", "Prometheus", "TLS", "DNS", "Ping", "SSH", "TCP":
+	default:
+		return false
+	}
+	if j.Url == "" {return false}
+	if j.Interval == 0 {return false}
+	if j.Timeout == 0 {
+		return false
+	}
+	return true
 }
 
 type SSHTest struct {
@@ -53,7 +101,7 @@ type SSHTest struct {
 }
 
 func (t SSHTest) RunTest() (time.Duration, error) {
-	return poll.SSH(t.Url, t.Port, t.Username, t.Password, t.UseKeyPair)
+	return poll.SSH(t.Url, t.Port, t.Timeout, t.Username, t.Password, t.UseKeyPair)
 }
 
 func (t SSHTest) Validate(idReq bool) bool {
@@ -82,7 +130,7 @@ type TCPTest struct {
 }
 
 func (t TCPTest) RunTest() (time.Duration, error) {
-	return poll.TCP(t.Url, t.Port)
+	return poll.TCP(t.Url, t.Port, t.Timeout)
 }
 
 func (t TCPTest) Validate(idReq bool) bool {
@@ -105,7 +153,7 @@ type TLSTest struct {
 }
 
 func (t TLSTest) RunTest() (time.Duration, error) {
-	return poll.TLS(t.Url, t.Port)
+	return poll.TLS(t.Url, t.Port, t.Timeout)
 }
 
 func (t TLSTest) Validate(idReq bool) bool {
@@ -127,7 +175,7 @@ type PingTest struct {
 }
 
 func (t PingTest) RunTest() (time.Duration, error) {
-	return poll.Ping(t.Url)
+	return poll.Ping(t.Url, t.Timeout)
 }
 
 func (t PingTest) Validate(idReq bool) bool {
@@ -193,23 +241,27 @@ func (t DNSTest) Get() BaseJob {
 	return t.BaseJob
 }
 
-
 type PrometheusTest struct {
 	MetricTests []poll.MetricTest `json:"metric_tests"`
 	BaseJob
 }
 
 func (t PrometheusTest) RunTest() (time.Duration, error) {
-	return poll.Prometheus(t.Url, t.Timeout * time.Second, t.MetricTests)
+	return poll.Prometheus(t.JobId, t.Url, t.Timeout * time.Second, t.MetricTests)
 }
 
 func (t PrometheusTest) Validate(idReq bool) bool {
 	if !t.BaseJob.Validate(idReq) {
 		return false
 	}
-	/*if len(t.MetricTests) == 0 {
+	if len(t.MetricTests) == 0 {
 		return false
-	}*/
+	}
+	for _, metricTest := range t.MetricTests {
+		if !metricTest.Validate() {
+			return false
+		}
+	}
 	return true
 }
 

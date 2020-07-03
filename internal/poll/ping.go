@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-func Ping(hostname string) (responseTime time.Duration, err error) {
+func Ping(hostname string, timeOut time.Duration) (responseTime time.Duration, err error) {
 	p := fastping.NewPinger()
 	p.MaxRTT = 10*time.Second
 
@@ -16,6 +16,8 @@ func Ping(hostname string) (responseTime time.Duration, err error) {
 	}
 
 	p.AddIPAddr(ra)
+
+	p.MaxRTT = timeOut
 
 	p.OnRecv = func(addr *net.IPAddr, rtt time.Duration) {
 		responseTime = rtt

@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-func TCP(hostname string, port string) (time.Duration, error) {
+func TCP(hostname string, port string, timeOut time.Duration) (time.Duration, error) {
 	start := time.Now()
 
 	tcpAddr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("%s:%s", hostname, port))
@@ -14,7 +14,8 @@ func TCP(hostname string, port string) (time.Duration, error) {
 		return time.Since(start), err
 	}
 
-	conn, err := net.DialTCP("tcp", nil, tcpAddr)
+	dialer := net.Dialer{Timeout: timeOut}
+	conn, err := dialer.Dial("tcp", tcpAddr.String())
 	if err != nil {
 		return time.Since(start), err
 	}
