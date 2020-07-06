@@ -9,8 +9,8 @@ import (
 )
 
 type notificationInformation struct {
-	JobId 			uint64 			`json:"job_id"`
-	JobName 		string 			`json:"job_name"`
+	TestId 			string 			`json:"test_id"`
+	TestName 		string 			`json:"test_name"`
 	Url 			string 			`json:"url"`
 	TestType 		string 			`json:"test_type"`
 	StatusCode 		uint 			`json:"status_code"`
@@ -19,17 +19,17 @@ type notificationInformation struct {
 	Interval 		time.Duration	`json:"interval"`
 }
 
-func PostHook(urls []string,  job pingr.BaseJob, jobErr error, statusCode uint) error {
+func PostHook(urls []string,  test pingr.BaseTest, testErr error, statusCode uint) error {
 	postMsg := notificationInformation{
-		JobId:      job.JobId,
-		JobName:    job.JobName,
-		Url:        job.Url,
-		TestType:   job.TestType,
+		TestId:      test.TestId,
+		TestName:    test.TestName,
+		Url:        test.Url,
+		TestType:   test.TestType,
 		StatusCode: statusCode,
-		Interval:   job.Interval,
+		Interval:   test.Interval,
 	}
-	if jobErr != nil {
-		postMsg.Message = jobErr.Error()
+	if testErr != nil {
+		postMsg.Message = testErr.Error()
 	}
 	if statusCode == 2 {
 		postMsg.StatusName = "Test failure"

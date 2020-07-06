@@ -15,9 +15,10 @@ import (
 	"pingr/internal/logging"
 	"pingr/internal/resources/contacts"
 	"pingr/internal/resources/health"
-	"pingr/internal/resources/jobcontacts"
-	"pingr/internal/resources/jobs"
+	"pingr/internal/resources/testcontacts"
+	"pingr/internal/resources/tests"
 	"pingr/internal/resources/logs"
+	"pingr/internal/resources/push"
 	"pingr/ui"
 )
 
@@ -32,10 +33,12 @@ func Init(closing <-chan struct{}, db *sqlx.DB) {
 	health.SetMetrics(e)
 	health.Init(closing, e.Group("health"))
 
-	jobs.Init(e.Group("jobs"))
+	tests.Init(e.Group("tests"))
 	logs.Init(e.Group("logs"))
 	contacts.Init(e.Group("contacts"))
-	jobcontacts.Init(e.Group("jobcontacts"))
+	testcontacts.Init(e.Group("testcontacts"))
+
+	push.Init(e.Group("push"))
 
 	// UI
 	e.GET("/*", func(c echo.Context) error {

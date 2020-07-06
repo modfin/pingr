@@ -53,5 +53,8 @@ func Get() []string {
 			}
 		}
 	})
-	return dnsServerIpAddr
+	if len(dnsServerIpAddr) > 0 {
+		return dnsServerIpAddr
+	}
+	return defaultDNSServers
 }

@@ -45,7 +45,7 @@ func SSH(hostname string, port string, timeOut time.Duration, username string, p
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // TODO: Add public key check
 	}
 
-	start := time.Now() // Maybe there's a better way of doing this
+	start := time.Now()
 	client, err := ssh.Dial("tcp",
 							fmt.Sprintf("%s:%s", hostname, port),
 							config)

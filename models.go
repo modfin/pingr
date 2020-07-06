@@ -1,13 +1,16 @@
 package pingr
 
 import (
+	"errors"
 	"pingr/internal/poll"
+	"pingr/internal/push"
+	"sync"
 	"time"
 )
 
 type Log struct {
 	LogId     		uint64			`db:"log_id"`
-	JobId     		uint64			`db:"job_id"`
+	TestId     		string			`db:"test_id"`
 	StatusId  		uint			`db:"status_id"`
 	Message   		string
 	ResponseTime 	time.Duration	`db:"response_time"`
@@ -15,14 +18,14 @@ type Log struct {
 }
 
 type Contact struct {
-	ContactId 	uint64 `json:"contact_id" db:"contact_id"`
+	ContactId 	string `json:"contact_id" db:"contact_id"`
 	ContactName string `json:"contact_name" db:"contact_name"`
 	ContactType string `json:"contact_type" db:"contact_type"`
 	ContactUrl 	string `json:"contact_url" db:"contact_url"`
 }
 
 func (c Contact) Validate(idReq bool) bool {
-	if idReq && c.ContactId == 0 {
+	if idReq && c.ContactId == "" {
 		return false
 	}
 	if c.ContactName == "" {
@@ -39,17 +42,17 @@ func (c Contact) Validate(idReq bool) bool {
 	return true
 }
 
-type JobContact struct {
-	ContactId 	uint64 	`json:"contact_id" db:"contact_id"`
-	JobId 		uint64 	`json:"job_id" db:"job_id"`
+type TestContact struct {
+	ContactId 	string 	`json:"contact_id" db:"contact_id"`
+	TestId 		string 	`json:"test_id" db:"test_id"`
 	Threshold	uint 	`json:"threshold" db:"threshold"`
 }
 
-func (c JobContact) Validate() bool {
-	if c.ContactId == 0 {
+func (c TestContact) Validate() bool {
+	if c.ContactId == "" {
 		return false
 	}
-	if c.JobId == 0 {
+	if c.TestId == "" {
 		return false
 	}
 	if c.Threshold == 0 {
@@ -58,34 +61,39 @@ func (c JobContact) Validate() bool {
 	return true
 }
 
-type Job interface {
+type Test interface {
 	RunTest() 		(time.Duration, error)
 	Validate(bool) 	bool
-	Get()			BaseJob
+	Get()			BaseTest
 }
 
-type BaseJob struct {
-	JobId		uint64			`json:"job_id" db:"job_id"`
-	JobName		string 			`json:"job_name" db:"job_name"`
+type BaseTest struct {
+	TestId		string			`json:"test_id" db:"test_id"`
+	TestName	string 			`json:"test_name" db:"test_name"`
+	Timeout 	time.Duration 	`json:"timeout"`
 	Url 		string 			`json:"url"`
 	Interval 	time.Duration 	`json:"interval"`
-	Timeout 	time.Duration 	`json:"timeout"`
 	CreatedAt	time.Time		`json:"created_at" db:"created_at"`
 	TestType 	string			`json:"test_type" db:"test_type"`
 }
 
-func (j BaseJob) Validate(idReq bool) bool {
-	if idReq && j.JobId == 0 {return false}
-	if j.JobName == "" {
+func (j BaseTest) Validate(idReq bool) bool {
+	if idReq && j.TestId == "" {return false}
+	if j.TestName == "" {
 		return false
 	}
 	switch j.TestType {
 	case "HTTP", "Prometheus", "TLS", "DNS", "Ping", "SSH", "TCP":
+		if j.Url == "" {
+			return false
+		}
+	case "HTTPPush", "PrometheusPush":
 	default:
 		return false
 	}
-	if j.Url == "" {return false}
-	if j.Interval == 0 {return false}
+	if j.Interval < 0 {
+		return false
+	}
 	if j.Timeout == 0 {
 		return false
 	}
@@ -97,7 +105,7 @@ type SSHTest struct {
 	Password	string 	`json:"password"`
 	Port		string 	`json:"port"`
 	UseKeyPair	bool 	`json:"use_key_pair"`
-	BaseJob
+	BaseTest
 }
 
 func (t SSHTest) RunTest() (time.Duration, error) {
@@ -105,7 +113,7 @@ func (t SSHTest) RunTest() (time.Duration, error) {
 }
 
 func (t SSHTest) Validate(idReq bool) bool {
-	if !t.BaseJob.Validate(idReq) {
+	if !t.BaseTest.Validate(idReq) {
 		return false
 	}
 	if t.Username == "" {
@@ -120,13 +128,13 @@ func (t SSHTest) Validate(idReq bool) bool {
 	return true
 }
 
-func (t SSHTest) Get() BaseJob {
-	return t.BaseJob
+func (t SSHTest) Get() BaseTest {
+	return t.BaseTest
 }
 
 type TCPTest struct {
 	Port	string `json:"port"`
-	BaseJob
+	BaseTest
 }
 
 func (t TCPTest) RunTest() (time.Duration, error) {
@@ -134,7 +142,7 @@ func (t TCPTest) RunTest() (time.Duration, error) {
 }
 
 func (t TCPTest) Validate(idReq bool) bool {
-	if !t.BaseJob.Validate(idReq) {
+	if !t.BaseTest.Validate(idReq) {
 		return false
 	}
 	if t.Port == "" {
@@ -143,13 +151,13 @@ func (t TCPTest) Validate(idReq bool) bool {
 	return true
 }
 
-func (t TCPTest) Get() BaseJob {
-	return t.BaseJob
+func (t TCPTest) Get() BaseTest {
+	return t.BaseTest
 }
 
 type TLSTest struct {
 	Port string `json:"port"`
-	BaseJob
+	BaseTest
 }
 
 func (t TLSTest) RunTest() (time.Duration, error) {
@@ -157,7 +165,7 @@ func (t TLSTest) RunTest() (time.Duration, error) {
 }
 
 func (t TLSTest) Validate(idReq bool) bool {
-	if !t.BaseJob.Validate(idReq) {
+	if !t.BaseTest.Validate(idReq) {
 		return false
 	}
 	if t.Port == "" {
@@ -166,12 +174,12 @@ func (t TLSTest) Validate(idReq bool) bool {
 	return true
 }
 
-func (t TLSTest) Get() BaseJob {
-	return t.BaseJob
+func (t TLSTest) Get() BaseTest {
+	return t.BaseTest
 }
 
 type PingTest struct {
-	BaseJob
+	BaseTest
 }
 
 func (t PingTest) RunTest() (time.Duration, error) {
@@ -179,21 +187,21 @@ func (t PingTest) RunTest() (time.Duration, error) {
 }
 
 func (t PingTest) Validate(idReq bool) bool {
-	if !t.BaseJob.Validate(idReq) {
+	if !t.BaseTest.Validate(idReq) {
 		return false
 	}
 	return true
 }
 
-func (t PingTest) Get() BaseJob {
-	return t.BaseJob
+func (t PingTest) Get() BaseTest {
+	return t.BaseTest
 }
 
 type HTTPTest struct {
 	Method 		string `json:"method"`
 	Payload		[]byte `json:"payload"`
 	ExpResult	[]byte `json:"exp_result"`
-	BaseJob
+	BaseTest
 }
 
 func (t HTTPTest) RunTest() (time.Duration, error) {
@@ -201,7 +209,7 @@ func (t HTTPTest) RunTest() (time.Duration, error) {
 }
 
 func (t HTTPTest) Validate(idReq bool) bool {
-	if !t.BaseJob.Validate(idReq) {
+	if !t.BaseTest.Validate(idReq) {
 		return false
 	}
 	switch t.Method {
@@ -212,15 +220,15 @@ func (t HTTPTest) Validate(idReq bool) bool {
 	return true
 }
 
-func (t HTTPTest) Get() BaseJob {
-	return t.BaseJob
+func (t HTTPTest) Get() BaseTest {
+	return t.BaseTest
 }
 
 type DNSTest struct {
 	 IpAddr string 		`json:"ip_addr"`
 	 CNAME	string 		`json:"cname"`
 	 TXT	[]string 	`json:"txt"`
-	 BaseJob
+	 BaseTest
 }
 
 func (t DNSTest) RunTest() (time.Duration, error) {
@@ -228,7 +236,7 @@ func (t DNSTest) RunTest() (time.Duration, error) {
 }
 
 func (t DNSTest) Validate(idReq bool) bool {
-	if !t.BaseJob.Validate(idReq) {
+	if !t.BaseTest.Validate(idReq) {
 		return false
 	}
 	if len(t.TXT) == 0 && t.CNAME == "" && t.IpAddr == "" { // Has to test something
@@ -237,21 +245,21 @@ func (t DNSTest) Validate(idReq bool) bool {
 	return true
 }
 
-func (t DNSTest) Get() BaseJob {
-	return t.BaseJob
+func (t DNSTest) Get() BaseTest {
+	return t.BaseTest
 }
 
 type PrometheusTest struct {
-	MetricTests []poll.MetricTest `json:"metric_tests"`
-	BaseJob
+	MetricTests []push.MetricTest `json:"metric_tests"`
+	BaseTest
 }
 
 func (t PrometheusTest) RunTest() (time.Duration, error) {
-	return poll.Prometheus(t.JobId, t.Url, t.Timeout * time.Second, t.MetricTests)
+	return poll.Prometheus(t.TestId, t.Url, t.Timeout * time.Second, t.MetricTests)
 }
 
 func (t PrometheusTest) Validate(idReq bool) bool {
-	if !t.BaseJob.Validate(idReq) {
+	if !t.BaseTest.Validate(idReq) {
 		return false
 	}
 	if len(t.MetricTests) == 0 {
@@ -265,6 +273,95 @@ func (t PrometheusTest) Validate(idReq bool) bool {
 	return true
 }
 
-func (t PrometheusTest) Get() BaseJob {
-	return t.BaseJob
+func (t PrometheusTest) Get() BaseTest {
+	return t.BaseTest
+}
+var (
+	MuPush				sync.RWMutex
+	PushChans 			= make(map[string] chan []byte)
+)
+
+type HTTPPushTest struct {
+	BaseTest
+}
+
+func (t HTTPPushTest) RunTest() (time.Duration, error) {
+	MuPush.RLock()
+	pushChannel, ok := PushChans[t.TestId]
+	MuPush.RUnlock()
+
+	if !ok {
+		MuPush.Lock()
+		PushChans[t.TestId] = make(chan []byte)
+		MuPush.Unlock()
+		pushChannel = PushChans[t.TestId]
+	}
+
+	start := time.Now()
+	select {
+	case <-pushChannel:
+		return time.Since(start), nil
+	case <-time.After(t.Timeout*time.Second):
+		return time.Since(start), errors.New("timeout reached on push test")
+	}
+}
+
+func (t HTTPPushTest) Validate(idReq bool) bool {
+	if !t.BaseTest.Validate(idReq) {
+		return false
+	}
+	return true
+}
+
+func (t HTTPPushTest) Get() BaseTest {
+	return t.BaseTest
+}
+
+type PrometheusPushTest struct {
+	MetricTests []push.MetricTest 	`json:"metric_tests"`
+	BaseTest
+}
+
+func (t PrometheusPushTest) RunTest() (time.Duration, error) {
+	MuPush.RLock()
+	pushChannel, ok := PushChans[t.TestId]
+	MuPush.RUnlock()
+
+	if !ok {
+		MuPush.Lock()
+		PushChans[t.TestId] = make(chan []byte)
+		MuPush.Unlock()
+		pushChannel = PushChans[t.TestId]
+	}
+
+	start := time.Now()
+	select {
+	case reqBody, ok := <-pushChannel:
+		if ok {
+			err := push.Prometheus(t.TestId, reqBody, t.MetricTests)
+			return time.Since(start), err
+		}
+		return 0, nil
+	case <-time.After(t.Timeout*time.Second):
+		return time.Since(start), errors.New("timeout reached on push test")
+	}
+}
+
+func (t PrometheusPushTest) Validate(idReq bool) bool {
+	if !t.BaseTest.Validate(idReq) {
+		return false
+	}
+	if len(t.MetricTests) == 0 {
+		return false
+	}
+	for _, metricTest := range t.MetricTests {
+		if !metricTest.Validate() {
+			return false
+		}
+	}
+	return true
+}
+
+func (t PrometheusPushTest) Get() BaseTest {
+	return t.BaseTest
 }

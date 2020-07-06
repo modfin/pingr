@@ -1,7 +1,7 @@
--- name: create-jobs-table
-CREATE TABLE IF NOT EXISTS jobs (
-    job_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-    job_name TEXT NOT NULL,
+-- name: create-tests-table
+CREATE TABLE IF NOT EXISTS tests (
+    test_id TEXT PRIMARY KEY,
+    test_name TEXT NOT NULL,
     test_type TEXT CHECK( test_type IN (
                                                 'HTTP',
                                                 'Prometheus',
@@ -9,7 +9,9 @@ CREATE TABLE IF NOT EXISTS jobs (
                                                 'DNS',
                                                 'Ping',
                                                 'SSH',
-                                                'TCP'
+                                                'TCP',
+                                                'HTTPPush',
+                                                'PrometheusPush'
                                             )
                                 ),
     url TEXT NOT NULL,
@@ -22,13 +24,13 @@ CREATE TABLE IF NOT EXISTS jobs (
 -- name: create-logs-table
 CREATE TABLE IF NOT EXISTS logs (
     log_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-    job_id INTEGER NOT NULL,
+    test_id TEXT NOT NULL,
     status_id INTEGER NOT NULL,
     message TEXT,
     response_time INTEGER,
     created_at TIMESTAMP NOT NULL,
-    FOREIGN KEY (job_id)
-        REFERENCES jobs (job_id)
+    FOREIGN KEY (test_id)
+        REFERENCES tests (test_id)
     FOREIGN KEY (status_id)
         REFERENCES status_map (status_id)
 );
@@ -42,18 +44,22 @@ CREATE TABLE IF NOT EXISTS status_map (
 
 -- name: create-contacts-table
 CREATE TABLE IF NOT EXISTS contacts (
-    contact_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    contact_id TEXT NOT NULL,
     contact_name TEXT NOT NULL,
-    contact_type TEXT NOT NULL, -- smtp OR endpoint
-    contact_url TEXT NOT NULL -- example@gmail.com OR callr.modfin.se
+    contact_type TEXT NOT NULL,
+    contact_url TEXT NOT NULL
 )
 
--- name: create-job-contact-mapper
-CREATE TABLE IF NOT EXISTS job_contacts (
-    job_id INTEGER NOT NULL,
-    contact_id INTEGER NOT NULL,
+-- name: create-test-contact-mapper
+CREATE TABLE IF NOT EXISTS test_contacts (
+    test_id TEXT NOT NULL,
+    contact_id TEXT NOT NULL,
     threshold INTEGER NOT NULL,
-    UNIQUE (contact_id, job_id)
+    UNIQUE (contact_id, test_id),
+    FOREIGN KEY (test_id)
+        REFERENCES tests (test_id)
+    FOREIGN KEY (contact_id)
+        REFERENCES contacts (contact_id)
 )
 
 -- name: init-status-mapper

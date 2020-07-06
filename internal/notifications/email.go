@@ -10,14 +10,13 @@ import (
 	"net/smtp"
 	"net/textproto"
 	"pingr"
+	"pingr/internal/config"
 	"pingr/internal/dao"
 	"strings"
 )
 
 var (
-	pass string = "2KPy8WJr2uLC46g"
-	from string = "pingrman@gmail.com"
-	htmlError string = `
+	htmlError = `
 			<h2>Pingr - Test error</h2>
 			<p>An <strong>error</strong> has occurred in one of your tests.</p>
 			<table cellspacing="10"><tbody>
@@ -27,7 +26,7 @@ var (
 			<h4>Recent logs:</h4>
 			<p>%s</p>
 	`
-	htmlSuccess string = `
+	htmlSuccess = `
 		<h2>Pingr - Test successful again</h2>
 			<p>Test <strong>successful</strong>.</p>
 			<table cellspacing="10"><tbody>
@@ -39,35 +38,36 @@ var (
 
 )
 
-func SendEmail(receivers []string, job pingr.BaseJob, jobErr error, db *sqlx.DB) error {
+func SendEmail(receivers []string, test pingr.BaseTest, testErr error, db *sqlx.DB) error {
 	logrus.Info("sending email")
-	logs, err := dao.GetJobLogsLimited(job.JobId, 10, db)
+
+	logs, err := dao.GetTestLogsLimited(test.TestId, 10, db)
 	if err != nil {
 		return err
 	}
 
 	for i := range receivers {
-		// add '+job-name' to receivers
+		// add '+test-name' to receivers
 		atIndex := strings.Index(receivers[i], "@")
-		receivers[i]=receivers[i][:atIndex]+"+"+slug.Make(job.JobName)+receivers[i][atIndex:]
+		receivers[i]=receivers[i][:atIndex]+"+"+slug.Make(test.TestName)+receivers[i][atIndex:]
 	}
 
 	e := &email.Email {
 		To:      receivers,
-		From:    fmt.Sprintf("Pingr Lad <%s>", from),
+		From:    fmt.Sprintf("Pingr Lad <%s>", config.Get().SMTPUsername),
 		Headers: textproto.MIMEHeader{},
 	}
 
-	if jobErr != nil {
-		e.Subject = fmt.Sprintf("Pingr - Error: %s", job.JobName)
-		e.HTML = []byte(fmt.Sprintf(htmlError, job.JobName, jobErr, logsHTML(logs)))
+	if testErr != nil {
+		e.Subject = fmt.Sprintf("Pingr - Error: %s", test.TestName)
+		e.HTML = []byte(fmt.Sprintf(htmlError, test.TestName, testErr, logsHTML(logs)))
 	} else {
-		e.Subject = fmt.Sprintf("Pingr - Test Succesful: %s", job.JobName)
-		e.HTML = []byte(fmt.Sprintf(htmlSuccess, job.JobName, logsHTML(logs)))
+		e.Subject = fmt.Sprintf("Pingr - Test Succesful: %s", test.TestName)
+		e.HTML = []byte(fmt.Sprintf(htmlSuccess, test.TestName, logsHTML(logs)))
 	}
 
-	a := smtp.PlainAuth("", from, pass, "smtp.gmail.com")
-	err = e.Send("smtp.gmail.com:587", a)
+	a := smtp.PlainAuth("", config.Get().SMTPUsername, config.Get().SMTPPassword, config.Get().SMTPHost)
+	err = e.Send(fmt.Sprintf("%s:%d", config.Get().SMTPHost, config.Get().SMTPPort), a)
 	if err != nil {
 		return err
 	}

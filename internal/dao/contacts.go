@@ -18,7 +18,7 @@ func GetContacts(db *sqlx.DB) ([]pingr.Contact, error) {
 	return contacts, nil
 }
 
-func GetContact(id uint64, db *sqlx.DB) (pingr.Contact, error) {
+func GetContact(id string, db *sqlx.DB) (pingr.Contact, error) {
 	q := `
 		SELECT * FROM contacts 
 		WHERE contact_id = $1
@@ -26,7 +26,7 @@ func GetContact(id uint64, db *sqlx.DB) (pingr.Contact, error) {
 	var c pingr.Contact
 	err := db.Get(&c, q, id)
 	if err != nil {
-		return c, nil
+		return c, err
 	}
 
 	return c, nil
@@ -34,8 +34,8 @@ func GetContact(id uint64, db *sqlx.DB) (pingr.Contact, error) {
 
 func PostContact(contact pingr.Contact, db *sqlx.DB) error {
 	q := `
-		INSERT INTO contacts(contact_name, contact_type, contact_url) 
-		VALUES (:contact_name,:contact_type,:contact_url);
+		INSERT INTO contacts(contact_id, contact_name, contact_type, contact_url) 
+		VALUES (:contact_id,:contact_name,:contact_type,:contact_url);
 	`
 	_, err := db.NamedExec(q, contact)
 	if err != nil {
@@ -61,7 +61,7 @@ func PutContact(contact pingr.Contact,  db *sqlx.DB)  error {
 	return nil
 }
 
-func DeleteContact(id uint64, db *sqlx.DB) error {
+func DeleteContact(id string, db *sqlx.DB) error {
 	q := `
 		DELETE FROM contacts 
 		WHERE contact_id = $1

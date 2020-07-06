@@ -27,7 +27,7 @@ func Init(g *echo.Group) {
 
 		logId, err := strconv.ParseUint(logIdString, 10, 64)
 		if err != nil {
-			return context.String(500, "Could not parse JobId as int")
+			return context.String(500, "Could not parse TestId as int")
 		}
 
 		log, err := dao.GetLog(logId, db)
@@ -47,7 +47,7 @@ func Init(g *echo.Group) {
 
 		logId, err := strconv.ParseUint(logIdString, 10, 64)
 		if err != nil {
-			return context.String(500, "Could not parse JobId as int")
+			return context.String(500, "Could not parse TestId as int")
 		}
 
 

@@ -40,10 +40,10 @@ func GetLog(id uint64, db *sqlx.DB) (l pingr.Log, err error) {
 	return
 }
 
-func GetJobLogs(id uint64, db *sqlx.DB) ([]pingr.Log, error) {
+func GetTestLogs(id string, db *sqlx.DB) ([]pingr.Log, error) {
 	q := `
 		SELECT * FROM logs 
-		WHERE job_id = $1
+		WHERE test_id = $1
 		ORDER BY created_at DESC 
 	`
 	var logs []pingr.Log
@@ -57,11 +57,11 @@ func GetJobLogs(id uint64, db *sqlx.DB) ([]pingr.Log, error) {
 }
 
 
-func GetJobLogsLimited(id uint64, limit int, db *sqlx.DB) ([]FullLog, error) {
+func GetTestLogsLimited(id string, limit int, db *sqlx.DB) ([]FullLog, error) {
 	q := `
 		SELECT sm.status_name, message, created_at, response_time FROM logs
 		INNER JOIN status_map sm on logs.status_id = sm.status_id
-		WHERE job_id = $1
+		WHERE test_id = $1
 		ORDER BY created_at DESC
 		LIMIT $2
 	`
@@ -77,8 +77,8 @@ func GetJobLogsLimited(id uint64, limit int, db *sqlx.DB) ([]FullLog, error) {
 
 func PostLog(log pingr.Log, db *sqlx.DB) error {
 	q := `
-		INSERT INTO logs(job_id, status_id, message, response_time, created_at) 
-		VALUES(:job_id,:status_id,:message,:response_time,:created_at);
+		INSERT INTO logs(test_id, status_id, message, response_time, created_at) 
+		VALUES(:test_id,:status_id,:message,:response_time,:created_at);
 	`
 	_, err := db.NamedExec(q, log)
 	if err != nil {
@@ -94,6 +94,20 @@ func DeleteLog(logId uint64, db *sqlx.DB) error {
 		WHERE log_id = $1
 	`
 	_, err := db.Exec(q, logId)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func DeleteLastNLogs(n uint, db *sqlx.DB) error {
+	q := `
+		DELETE FROM logs
+		WHERE log_id IN 
+			(SELECT log_id FROM logs ORDER BY created_at LIMIT $1)
+	`
+	_, err := db.Exec(q, n)
 	if err != nil {
 		return err
 	}

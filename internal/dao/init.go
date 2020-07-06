@@ -34,7 +34,7 @@ func setupTables(db *sqlx.DB) error {
 		return err
 	}
 
-	_, err = dot.Exec(db, "create-jobs-table")
+	_, err = dot.Exec(db, "create-tests-table")
 	if err != nil {
 		return err
 	}
@@ -50,7 +50,7 @@ func setupTables(db *sqlx.DB) error {
 		return err
 	}
 
-	_, err = dot.Exec(db, "create-job-contact-mapper")
+	_, err = dot.Exec(db, "create-test-contact-mapper")
 	if err != nil {
 		return err
 	}

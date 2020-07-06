@@ -5,16 +5,20 @@ import (
 	"fmt"
 	"github.com/jmoiron/sqlx"
 	log "github.com/sirupsen/logrus"
+	"math"
+	"os"
 	"pingr"
+	"pingr/internal/config"
 	"pingr/internal/dao"
 	"pingr/internal/notifications"
 	"reflect"
 	"sync"
+	"syscall"
 	"time"
 )
 
 const (
-	JobTimeoutCheckInterval = 1 * time.Minute // Put in config?
+	TestTimeoutCheckInterval = 1 * time.Minute // Put in config?
 	DataBaseListenerInterval = 10 * time.Minute
 
 	// Change in DB as well
@@ -26,86 +30,92 @@ const (
 	Deleted 	uint    = 6
 )
 
-
 var (
-	muJobs 				sync.RWMutex
+	muTests 				sync.RWMutex
 
-	jobs 				= make(map[uint64] pingr.Job)
-	closeChans 			= make(map[uint64] chan int)
+	tests 				= make(map[string] pingr.Test)
+	closeChans 			= make(map[string] chan int)
 
-	newJobChan          = make(chan pingr.Job, 10) // To be discussed
-	deletedJobChan      = make(chan uint64, 10)
-	statusChan          = make(chan jobStatus, 10)
+	newTestChan          = make(chan pingr.Test, 10) // To be discussed
+	deletedTestChan      = make(chan string, 10)
+	statusChan          = make(chan testStatus, 10)
 	logChan             = make(chan pingr.Log)
 	notifyDBHandler     = make(chan int, 10)
 	timeForTimeoutCheck = make(chan int)
 )
 
-type jobStatus struct {
-	JobId		uint64
+type testStatus struct {
+	TestId		string
 	Status 		uint
 	Error		error
 }
 
 func Scheduler(db *sqlx.DB) {
-	go logger(db)
-
 	initVars(db)
+
+	go discSpaceMaintainer(db)
 
 	go dataBaseListener(db) // Best way to handle DB error??
 
-	go jobMaintainer(db)
+	go testMaintainer(db)
 
 	for {
 		select {
-			case newJob := <- newJobChan:
-				muJobs.Lock()
-				jobId := newJob.Get().JobId
-				jobs[jobId] = newJob
-				muJobs.Unlock()
+			case newTest := <- newTestChan:
+				muTests.Lock()
+				testId := newTest.Get().TestId
+				tests[testId] = newTest
+				muTests.Unlock()
 
-				if _, ok := closeChans[jobId]; ok {
-					close(closeChans[jobId])
-					delete(closeChans, jobId)
+				if _, ok := closeChans[testId]; ok {
+					close(closeChans[testId])
+					delete(closeChans, testId)
 				}
 
-				addJobLog(jobId, Initialized, 0, nil)
-				statusChan <- jobStatus{jobId, Initialized, nil}
+				addTestLog(testId, Initialized, 0, nil, db)
+				statusChan <- testStatus{testId, Initialized, nil}
 
-				closeChans[jobId] = make(chan int)
-				go worker(newJob, closeChans[jobId])
+				closeChans[testId] = make(chan int)
+				go worker(newTest, closeChans[testId], db)
 
-			case deletedJobId := <- deletedJobChan:
-				if _, ok := closeChans[deletedJobId]; ok {
-					close(closeChans[deletedJobId])
-					delete(closeChans, deletedJobId)
+			case deletedTestId := <- deletedTestChan:
+				if c, ok := closeChans[deletedTestId]; ok {
+					close(c)
+					delete(closeChans, deletedTestId)
 				}
-				addJobLog(deletedJobId, Deleted, 0, nil)
-				statusChan <- jobStatus{deletedJobId, Deleted, nil}
+				addTestLog(deletedTestId, Deleted, 0, nil, db)
+				statusChan <- testStatus{deletedTestId, Deleted, nil}
 
-				muJobs.Lock()
-				if _, ok := jobs[deletedJobId]; ok {
-					delete(jobs, deletedJobId)
-					log.Info(fmt.Sprintf("JobID: %d, Job deleted", deletedJobId))
+				pingr.MuPush.Lock()
+				if c, ok := pingr.PushChans[deletedTestId]; ok {
+					close(c)
+					delete(pingr.PushChans, deletedTestId)
 				}
-				muJobs.Unlock()
-			case <-time.After(JobTimeoutCheckInterval):
+				pingr.MuPush.Unlock()
+
+				muTests.Lock()
+				if _, ok := tests[deletedTestId]; ok {
+					delete(tests, deletedTestId)
+					log.Info(fmt.Sprintf("TestID: %d, Test deleted", deletedTestId))
+				}
+				muTests.Unlock()
+			case <-time.After(TestTimeoutCheckInterval):
 				timeForTimeoutCheck <- 1
 		}
 	}
 }
 
-func worker(job pingr.Job, close chan int) {
-	jobId := job.Get().JobId
+func worker(test pingr.Test, close chan int, db *sqlx.DB) {
+	testId := test.Get().TestId
 	for {
 		select {
 		case <-close:
 			return
 		default:
-			statusChan <- jobStatus{jobId, Running,nil}
+			statusChan <- testStatus{testId, Running,nil}
 		}
 
-		rt, err := job.RunTest()
+		rt, err := test.RunTest()
 
 		select {
 		case <-close:
@@ -115,42 +125,42 @@ func worker(job pingr.Job, close chan int) {
 			if err != nil {
 				statusCode = Error
 			}
-			addJobLog(jobId, statusCode, rt, err)
-			statusChan <- jobStatus{jobId, statusCode, err}
+			addTestLog(testId, statusCode, rt, err, db)
+			statusChan <- testStatus{testId, statusCode, err}
 		}
 
 		select {
-		case <-time.After(job.Get().Interval * time.Second):
+		case <-time.After(test.Get().Interval * time.Second):
 		case <-close:
 			return
 		}
 	}
 }
 
-func jobMaintainer(db *sqlx.DB) {
-	jobStatusMap := make(map[uint64]uint)
-	lastUpdated := make(map[uint64]time.Time)
-	consecutiveErrors := make(map[uint64]uint)
-	jobContactsNotified := make(map[uint64][]uint64)
+func testMaintainer(db *sqlx.DB) {
+	testStatusMap := make(map[string]uint)
+	lastUpdated := make(map[string]time.Time)
+	consecutiveErrors := make(map[string]uint)
+	testContactsNotified := make(map[string][]string)
 	for {
 		select {
 		case status := <-statusChan:
-			id := status.JobId
+			id := status.TestId
 			switch status.Status {
-			case Successful: // sometimes check!!
-				jobStatusMap[id] = Successful
+			case Successful:
+				testStatusMap[id] = Successful
 				consecutiveErrors[id] = 0
-				if _, ok := jobContactsNotified[id]; ok {
+				if _, ok := testContactsNotified[id]; ok {
 					// This is an active incident, notify that test is successful again
-					muJobs.RLock()
-					// Check that job still exists
-					if _, ok := jobs[id]; !ok {
-						muJobs.RUnlock()
+					muTests.RLock()
+					// Check that test still exists
+					if _, ok := tests[id]; !ok {
+						muTests.RUnlock()
 						break
 					}
 					var mailsToContact []string
 					var postHooksToSend []string
-					for _, contactId := range jobContactsNotified[id] {
+					for _, contactId := range testContactsNotified[id] {
 						// Acquire contacted contacts
 						contact, err := dao.GetContact(contactId, db)
 						if err != nil {
@@ -165,76 +175,76 @@ func jobMaintainer(db *sqlx.DB) {
 					}
 					var emailErr, postHookErr error
 					if len(mailsToContact) != 0 {
-						emailErr = notifications.SendEmail(mailsToContact, jobs[id].Get(), status.Error, db)
+						emailErr = notifications.SendEmail(mailsToContact, tests[id].Get(), status.Error, db)
 					}
 					if len(postHooksToSend) != 0 {
-						postHookErr = notifications.PostHook(postHooksToSend, jobs[id].Get(), status.Error, Successful)
+						postHookErr = notifications.PostHook(postHooksToSend, tests[id].Get(), status.Error, Successful)
 					}
 					if emailErr == nil && postHookErr == nil {
 						// Keep sending until no errors occur
-						delete(jobContactsNotified, id)
+						delete(testContactsNotified, id)
 					}
-					muJobs.RUnlock()
+					muTests.RUnlock()
 				}
 			case Error:
-				jobStatusMap[id] = Error
+				testStatusMap[id] = Error
 				consecutiveErrors[id]++
-				jobContactTypes, err := dao.GetJobContactsType(id, db)
+				testContactTypes, err := dao.GetTestContactsType(id, db)
 				if err != nil {
 					log.Error(err)
 				}
-				muJobs.RLock()
-				// Check that job still exists
-				if _, ok := jobs[id]; !ok {
-					muJobs.RUnlock()
+				muTests.RLock()
+				// Check that test still exists
+				if _, ok := tests[id]; !ok {
+					muTests.RUnlock()
 					break
 				}
-				jobContactsNotified[id] = notifyContactsError(id, Error, status.Error,
-											consecutiveErrors[id], jobContactTypes,
-											jobContactsNotified[id], db)
-				muJobs.RUnlock()
+				testContactsNotified[id] = notifyContactsError(id, Error, status.Error,
+											consecutiveErrors[id], testContactTypes,
+											testContactsNotified[id], db)
+				muTests.RUnlock()
 			case Running:
-				jobStatusMap[id] = Running
+				testStatusMap[id] = Running
 				lastUpdated[id] = time.Now()
 			case Initialized:
-				jobStatusMap[id] = Initialized
+				testStatusMap[id] = Initialized
 				consecutiveErrors[id] = 0
 			case Deleted:
-				delete(jobStatusMap, id)
+				delete(testStatusMap, id)
 				delete(lastUpdated, id)
 				delete(consecutiveErrors, id)
 			default:
 				log.Error("invalid status code sent on statusChan")
 			}
 		case <-timeForTimeoutCheck:
-			log.Info("looking for timed out jobs")
-			for id, statusCode := range jobStatusMap {
+			log.Info("looking for timed out tests")
+			for id, statusCode := range testStatusMap {
 				if statusCode == Running {
-					muJobs.RLock()
-					if runningJob, ok := jobs[id]; ok {
-						jobTimeout := runningJob.Get().Timeout*2
-						if time.Now().After(lastUpdated[id].Add(jobTimeout)) {
-							jobStatusMap[id] = TimedOut
+					muTests.RLock()
+					if runningTest, ok := tests[id]; ok {
+						testTimeout := runningTest.Get().Timeout*2*time.Second // TODO: *2
+						if time.Now().After(lastUpdated[id].Add(testTimeout)) {
+							testStatusMap[id] = TimedOut
 							consecutiveErrors[id]++
-							jobError := errors.New("job timed out - found while manually checking for timeouts")
-							addJobLog(id, TimedOut, jobTimeout, jobError)
-							jobContactTypes, err := dao.GetJobContactsType(id, db)
+							testError := errors.New("test timed out - found while manually checking for timeouts")
+							addTestLog(id, TimedOut, testTimeout, testError, db)
+							testContactTypes, err := dao.GetTestContactsType(id, db)
 							if err != nil {
 								log.Error(err)
 							}
-							// Check that job still exists
-							if _, ok := jobs[id]; !ok {
-								muJobs.RUnlock()
+							// Check that test still exists
+							if _, ok := tests[id]; !ok {
+								muTests.RUnlock()
 								continue
 							}
-							jobContactsNotified[id] = notifyContactsError(id, TimedOut, jobError,
-														consecutiveErrors[id], jobContactTypes,
-														jobContactsNotified[id], db)
-							newJobChan <- jobs[id] // Might not be the right way of doing it
+							testContactsNotified[id] = notifyContactsError(id, TimedOut, testError,
+														consecutiveErrors[id], testContactTypes,
+														testContactsNotified[id], db)
+							newTestChan <- tests[id] // Might not be the right way of doing it
 							// could cause an infinite amount of goroutines to get stuck
 						}
 					}
-					muJobs.RUnlock()
+					muTests.RUnlock()
 				}
 			}
 		}
@@ -242,26 +252,26 @@ func jobMaintainer(db *sqlx.DB) {
 }
 
 func notifyContactsError(
-		jobId uint64,
+		testId string,
 		statusCode uint,
-		jobError error,
+		testError error,
 		consecutiveErrors uint,
-		jobContacts []dao.JobContactType,
-		jobContactsNotified[]uint64,
+		testContacts []dao.TestContactType,
+		testContactsNotified[]string,
 		db *sqlx.DB,
-	)[]uint64 {
+	)[]string {
 
 	var mailsToContact []string
-	var mailContactIds []uint64
+	var mailContactIds []string
 	var postHooksToSend []string
-	var hookContactIds []uint64
+	var hookContactIds []string
 
-	for _, contactType := range jobContacts {
+	for _, contactType := range testContacts {
 		// Have we reached the threshold for contact?
 		if consecutiveErrors >= contactType.Threshold {
 			// Check if contact has already been contacted
 			contacted := false
-			for _, contactId := range jobContactsNotified {
+			for _, contactId := range testContactsNotified {
 				if contactId == contactType.ContactId {
 					contacted = true
 				}
@@ -281,34 +291,22 @@ func notifyContactsError(
 	}
 	// Notify contacts
 	if len(mailsToContact) != 0 {
-		err := notifications.SendEmail(mailsToContact, jobs[jobId].Get(), jobError, db)
+		err := notifications.SendEmail(mailsToContact, tests[testId].Get(), testError, db)
 		if err != nil {
-			log.Error("unable to send email")
+			log.Error("unable to send email: ", err)
 		} else {
-			jobContactsNotified = append(jobContactsNotified, mailContactIds...)
+			testContactsNotified = append(testContactsNotified, mailContactIds...)
 		}
 	}
 	if len(postHooksToSend) != 0 {
-		err := notifications.PostHook(postHooksToSend, jobs[jobId].Get(), jobError, statusCode)
+		err := notifications.PostHook(postHooksToSend, tests[testId].Get(), testError, statusCode)
 		if err != nil {
 			log.Error("unable to post hook")
 		} else {
-			jobContactsNotified = append(jobContactsNotified, hookContactIds...)
+			testContactsNotified = append(testContactsNotified, hookContactIds...)
 		}
 	}
-	return jobContactsNotified
-}
-
-func logger(db *sqlx.DB) {
-	for {
-		select {
-		case l := <-logChan: // maybe loop until we added log?
-			err := dao.PostLog(l, db)
-			if err != nil {
-				log.Warn(err)
-			}
-		}
-	}
+	return testContactsNotified
 }
 
 func dataBaseListener(db *sqlx.DB) {
@@ -317,95 +315,137 @@ func dataBaseListener(db *sqlx.DB) {
 			case <-time.After(DataBaseListenerInterval):
 			case <-notifyDBHandler:
 		}
-		log.Info("Looking for new/updated jobs in DB")
-		jobsDB, err := dao.GetJobs(db)
+		log.Info("Looking for new/updated tests in DB")
+		testsDB, err := dao.GetTests(db)
 		if err != nil {
 			continue // Bad
 		}
 
-		var newJobs [] pingr.Job
-		var deletedJobs []uint64
+		var newTests [] pingr.Test
+		var deletedTests []string
 
-		// Look for new/updated job
-		muJobs.RLock()
-		for _, j := range jobsDB {
-			if !reflect.DeepEqual(jobs[j.Get().JobId], j) { // Found a new/updated job
-				newJobs = append(newJobs, j)
+		// Look for new/updated test
+		muTests.RLock()
+		for _, j := range testsDB {
+			if !reflect.DeepEqual(tests[j.Get().TestId], j) { // Found a new/updated test
+				newTests = append(newTests, j)
 			}
 		}
 
-		// Look for deleted jobs
-		for jobId := range jobs {
+		// Look for deleted tests
+		for testId := range tests {
 			// slow but probably okay since user wont update/add that often
-			if !intInSlice(jobId, jobsDB) {
-				deletedJobs = append(deletedJobs, jobId)
+			if !intInSlice(testId, testsDB) {
+				deletedTests = append(deletedTests, testId)
 			}
 		}
-		muJobs.RUnlock()
+		muTests.RUnlock()
 
 		// Save result in array and send on channel after Unlock to avoid deadlock
-		for _, newJob := range newJobs {
-			newJobChan <- newJob
+		for _, newTest := range newTests {
+			newTestChan <- newTest
 		}
-		for _, jobId := range deletedJobs {
-			deletedJobChan <- jobId
+		for _, testId := range deletedTests {
+			deletedTestChan <- testId
 		}
 
 	}
 }
 
 func initVars(db *sqlx.DB) {
-	jobsDB, err := dao.GetJobs(db)
+	testsDB, err := dao.GetTests(db)
 	if err != nil {
 		log.Warn(err)
 	}
 
-	muJobs.Lock()
-	defer muJobs.Unlock()
+	muTests.Lock()
+	defer muTests.Unlock()
 
-	for _, job := range jobsDB {
-		jobId := job.Get().JobId
-		jobs[jobId] = job
+	for _, test := range testsDB {
+		testId := test.Get().TestId
+		tests[testId] = test
 
-		addJobLog(jobId, Initialized, 0, nil)
-		statusChan <- jobStatus{jobId, Initialized, nil}
+		addTestLog(testId, Initialized, 0, nil, db)
+		statusChan <- testStatus{testId, Initialized, nil}
 
-		closeChans[jobId] = make(chan int)
-		go worker(job, closeChans[jobId])
+		closeChans[testId] = make(chan int)
+		go worker(test, closeChans[testId], db)
 	}
 }
 
-func addJobLog(jobId uint64, statusCode uint, rt time.Duration, err error) {
+func addTestLog(testId string, statusCode uint, rt time.Duration, err error, db *sqlx.DB) {
 	var logMessage string
 	if err != nil {
 		logMessage = err.Error()
 	}
-	log.Info(fmt.Sprintf("JobID: %d, StatusCode: %d", jobId, statusCode))
+	log.Info(fmt.Sprintf("TestID: %d, StatusCode: %d", testId, statusCode))
 	l := pingr.Log{
-		JobId:     		jobId,
+		TestId:     		testId,
 		StatusId:  		statusCode,
 		Message:   		logMessage,
 		ResponseTime: 	rt,
 		CreatedAt: 		time.Now(),
 	}
-	logChan <- l
+	err = dao.PostLog(l, db)
+	if err != nil {
+		log.Warn(err)
+	}
 }
 
-func NotifyNewJob() {
+func discSpaceMaintainer(db *sqlx.DB) {
+	for {
+		log.Info("checking available disc space")
+		var stat syscall.Statfs_t
+
+		wd, err := os.Getwd()
+		if err != nil {
+			log.Error(err)
+		}
+		err = syscall.Statfs(wd, &stat)
+		if err != nil {
+			log.Error(err)
+		}
+		availableGB := stat.Bavail*uint64(stat.Bsize)/uint64(math.Pow(1024,3))
+		if availableGB < config.Get().MinDiscStorage {
+			err = dao.DeleteLastNLogs(100000, db)
+			if err != nil {
+				log.Error(err)
+			}
+		}
+		time.Sleep(time.Hour)
+	}
+
+}
+
+func NotifyNewTest() {
 	notifyDBHandler <- 1
 }
 
-func NotifyUpdatedJob(job pingr.Job) {
-	newJobChan <- job
+func NotifyUpdatedTest(test pingr.Test) {
+	newTestChan <- test
 }
 
-func NotifyDeletedJob(jobId uint64){
-	deletedJobChan <- jobId
+func NotifyDeletedTest(testId string){
+	deletedTestChan <- testId
 }
 
-func intInSlice(a uint64, list []pingr.Job) bool {
+func NotifyPushTest(testId string, body []byte) error {
+	pingr.MuPush.RLock()
+	defer pingr.MuPush.RUnlock()
+	if _, ok := pingr.PushChans[testId]; ok {
+		select {
+		case pingr.PushChans[testId] <- body:
+			return nil
+		default:
+			return errors.New("test not responding")
+		}
+	}
+	return errors.New("test not initialized yet")
+}
+
+func intInSlice(a string, list []pingr.Test) bool {
 	for _, b := range list {
-		if b.Get().JobId == a {
+		if b.Get().TestId == a {
 			return true
 		}
 	}

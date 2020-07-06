@@ -1,11 +1,14 @@
 package contacts
 
 import (
+	"errors"
+	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo/v4"
 	"pingr"
 	"pingr/internal/dao"
-	"strconv"
+	"pingr/internal/notifications"
+	"time"
 )
 
 func Init(g *echo.Group) {
@@ -21,12 +24,7 @@ func Init(g *echo.Group) {
 
 	g.GET("/:contactId", func(context echo.Context) error {
 		db := context.Get("DB").(*sqlx.DB)
-		contactIdStr:= context.Param("contactId")
-
-		contactId, err := strconv.ParseUint(contactIdStr, 10, 64)
-		if err != nil {
-			return context.String(500, "Could not parse contactId as int")
-		}
+		contactId:= context.Param("contactId")
 
 		contact, err := dao.GetContact(contactId, db)
 		if err != nil {
@@ -44,6 +42,7 @@ func Init(g *echo.Group) {
 		if !contact.Validate(false) {
 			return context.String(500, "invalid input: Contact")
 		}
+		contact.ContactId = uuid.New().String()
 
 		db := context.Get("DB").(*sqlx.DB)
 		err := dao.PostContact(contact, db)
@@ -78,14 +77,10 @@ func Init(g *echo.Group) {
 	})
 
 	g.DELETE("/delete/:contactId", func(context echo.Context) error {
-		contactIdStr:= context.Param("contactId")
+		contactId:= context.Param("contactId")
 
-		contactId, err := strconv.ParseUint(contactIdStr, 10, 64)
-		if err != nil {
-			return context.String(500, "Could not parse contactId as uint")
-		}
 		db := context.Get("DB").(*sqlx.DB)
-		_, err = dao.GetContact(contactId, db)
+		_, err := dao.GetContact(contactId, db)
 		if err != nil {
 			return context.String(500, "Not a valid/active contactId, " + err.Error())
 		}
@@ -96,5 +91,41 @@ func Init(g *echo.Group) {
 		}
 
 		return context.String(500, "contact deleted")
+	})
+
+	g.POST("/test", func(c echo.Context) error {
+		var contact pingr.Contact
+		if err := c.Bind(&contact); err != nil {
+			return c.String(500, "Could not parse body as contact type: " + err.Error())
+		}
+		if !contact.Validate(false) {
+			return c.String(500, "invalid input: Contact")
+		}
+
+		testTest := pingr.BaseTest{
+			TestId:    "test-uuid-1234",
+			TestName:  "<Your-test-name>",
+			Timeout:   120,
+			Url:       "some-url.com",
+			Interval:  10,
+			CreatedAt: time.Now(),
+			TestType:  "HTTP",
+		}
+
+		testError := errors.New("something went wrong")
+
+		switch contact.ContactType {
+		case "smtp":
+			 err := notifications.SendEmail([]string{contact.ContactUrl}, testTest, testError, c.Get("DB").(*sqlx.DB))
+			 if err != nil {
+			 	return c.String(500, "an error occurred during the test: " + err.Error())
+			 }
+		case "http":
+			err := notifications.PostHook([]string{contact.ContactUrl}, testTest, testError, 3)
+			if err != nil {
+				return c.String(500, "an error occurred during the test: " + err.Error())
+			}
+		}
+		return c.String(200, "your test ran without error, check your contact url")
 	})
 }
