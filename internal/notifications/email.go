@@ -13,6 +13,7 @@ import (
 	"pingr/internal/config"
 	"pingr/internal/dao"
 	"strings"
+	"time"
 )
 
 var (
@@ -87,7 +88,7 @@ func logsHTML(logs []dao.FullLog) string {
 		html += fmt.Sprintf(
 			"<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>",
 			log.CreatedAt.Format("2006-01-02T15:04:05"), log.StatusName,
-			log.Message, log.ResponseTime)
+			log.Message, log.ResponseTime.Round(time.Millisecond).String())
 	}
 	html += "</tbody></table>"
 	return html

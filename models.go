@@ -24,8 +24,8 @@ type Contact struct {
 	ContactUrl 	string `json:"contact_url" db:"contact_url"`
 }
 
-func (c Contact) Validate(idReq bool) bool {
-	if idReq && c.ContactId == "" {
+func (c Contact) Validate() bool {
+	if c.ContactId == "" {
 		return false
 	}
 	if c.ContactName == "" {
@@ -62,9 +62,9 @@ func (c TestContact) Validate() bool {
 }
 
 type Test interface {
-	RunTest() 		(time.Duration, error)
-	Validate(bool) 	bool
-	Get()			BaseTest
+	RunTest() 	(time.Duration, error)
+	Validate()	bool
+	Get()		BaseTest
 }
 
 type BaseTest struct {
@@ -77,8 +77,8 @@ type BaseTest struct {
 	TestType 	string			`json:"test_type" db:"test_type"`
 }
 
-func (j BaseTest) Validate(idReq bool) bool {
-	if idReq && j.TestId == "" {return false}
+func (j BaseTest) Validate() bool {
+	if j.TestId == "" {return false}
 	if j.TestName == "" {
 		return false
 	}
@@ -112,8 +112,8 @@ func (t SSHTest) RunTest() (time.Duration, error) {
 	return poll.SSH(t.Url, t.Port, t.Timeout, t.Username, t.Password, t.UseKeyPair)
 }
 
-func (t SSHTest) Validate(idReq bool) bool {
-	if !t.BaseTest.Validate(idReq) {
+func (t SSHTest) Validate() bool {
+	if !t.BaseTest.Validate() {
 		return false
 	}
 	if t.Username == "" {
@@ -141,8 +141,8 @@ func (t TCPTest) RunTest() (time.Duration, error) {
 	return poll.TCP(t.Url, t.Port, t.Timeout)
 }
 
-func (t TCPTest) Validate(idReq bool) bool {
-	if !t.BaseTest.Validate(idReq) {
+func (t TCPTest) Validate() bool {
+	if !t.BaseTest.Validate() {
 		return false
 	}
 	if t.Port == "" {
@@ -156,7 +156,7 @@ func (t TCPTest) Get() BaseTest {
 }
 
 type TLSTest struct {
-	Port string `json:"port"`
+	Port 	string `json:"port"`
 	BaseTest
 }
 
@@ -164,8 +164,8 @@ func (t TLSTest) RunTest() (time.Duration, error) {
 	return poll.TLS(t.Url, t.Port, t.Timeout)
 }
 
-func (t TLSTest) Validate(idReq bool) bool {
-	if !t.BaseTest.Validate(idReq) {
+func (t TLSTest) Validate() bool {
+	if !t.BaseTest.Validate() {
 		return false
 	}
 	if t.Port == "" {
@@ -186,8 +186,8 @@ func (t PingTest) RunTest() (time.Duration, error) {
 	return poll.Ping(t.Url, t.Timeout)
 }
 
-func (t PingTest) Validate(idReq bool) bool {
-	if !t.BaseTest.Validate(idReq) {
+func (t PingTest) Validate() bool {
+	if !t.BaseTest.Validate() {
 		return false
 	}
 	return true
@@ -208,8 +208,8 @@ func (t HTTPTest) RunTest() (time.Duration, error) {
 	return poll.HTTP(t.Url, t.Method, t.Timeout*time.Second, t.Payload, t.ExpResult)
 }
 
-func (t HTTPTest) Validate(idReq bool) bool {
-	if !t.BaseTest.Validate(idReq) {
+func (t HTTPTest) Validate() bool {
+	if !t.BaseTest.Validate() {
 		return false
 	}
 	switch t.Method {
@@ -235,8 +235,8 @@ func (t DNSTest) RunTest() (time.Duration, error) {
 	return poll.DNS(t.Url, t.Timeout*time.Second, t.IpAddr, t.CNAME, t.TXT)
 }
 
-func (t DNSTest) Validate(idReq bool) bool {
-	if !t.BaseTest.Validate(idReq) {
+func (t DNSTest) Validate() bool {
+	if !t.BaseTest.Validate() {
 		return false
 	}
 	if len(t.TXT) == 0 && t.CNAME == "" && t.IpAddr == "" { // Has to test something
@@ -249,6 +249,11 @@ func (t DNSTest) Get() BaseTest {
 	return t.BaseTest
 }
 
+var (
+	MuPush				sync.RWMutex
+	PushChans 			= make(map[string] chan []byte)
+)
+
 type PrometheusTest struct {
 	MetricTests []push.MetricTest `json:"metric_tests"`
 	BaseTest
@@ -258,8 +263,8 @@ func (t PrometheusTest) RunTest() (time.Duration, error) {
 	return poll.Prometheus(t.TestId, t.Url, t.Timeout * time.Second, t.MetricTests)
 }
 
-func (t PrometheusTest) Validate(idReq bool) bool {
-	if !t.BaseTest.Validate(idReq) {
+func (t PrometheusTest) Validate() bool {
+	if !t.BaseTest.Validate() {
 		return false
 	}
 	if len(t.MetricTests) == 0 {
@@ -276,10 +281,7 @@ func (t PrometheusTest) Validate(idReq bool) bool {
 func (t PrometheusTest) Get() BaseTest {
 	return t.BaseTest
 }
-var (
-	MuPush				sync.RWMutex
-	PushChans 			= make(map[string] chan []byte)
-)
+
 
 type HTTPPushTest struct {
 	BaseTest
@@ -306,8 +308,8 @@ func (t HTTPPushTest) RunTest() (time.Duration, error) {
 	}
 }
 
-func (t HTTPPushTest) Validate(idReq bool) bool {
-	if !t.BaseTest.Validate(idReq) {
+func (t HTTPPushTest) Validate() bool {
+	if !t.BaseTest.Validate() {
 		return false
 	}
 	return true
@@ -347,8 +349,8 @@ func (t PrometheusPushTest) RunTest() (time.Duration, error) {
 	}
 }
 
-func (t PrometheusPushTest) Validate(idReq bool) bool {
-	if !t.BaseTest.Validate(idReq) {
+func (t PrometheusPushTest) Validate() bool {
+	if !t.BaseTest.Validate() {
 		return false
 	}
 	if len(t.MetricTests) == 0 {

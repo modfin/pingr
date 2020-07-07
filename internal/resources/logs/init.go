@@ -27,7 +27,7 @@ func Init(g *echo.Group) {
 
 		logId, err := strconv.ParseUint(logIdString, 10, 64)
 		if err != nil {
-			return context.String(500, "Could not parse TestId as int")
+			return context.String(400, "Could not parse logId as int")
 		}
 
 		log, err := dao.GetLog(logId, db)
@@ -39,15 +39,15 @@ func Init(g *echo.Group) {
 	})
 
 	// Delete a log
-	g.DELETE("/delete/:logId", func(context echo.Context) error {
+	g.DELETE("/:logId", func(context echo.Context) error {
 		logIdString:= context.Param("logId")
 		if logIdString == "" {
-			return context.String(500, "Please include logId in body")
+			return context.String(400, "Please include logId in body")
 		}
 
 		logId, err := strconv.ParseUint(logIdString, 10, 64)
 		if err != nil {
-			return context.String(500, "Could not parse TestId as int")
+			return context.String(400, "Could not parse TestId as int")
 		}
 
 
@@ -57,6 +57,6 @@ func Init(g *echo.Group) {
 			context.String(500, "Could not delete Log, " + err.Error())
 		}
 
-		return context.String(500, "Log deleted")
+		return context.String(200, "Log deleted")
 	})
 }

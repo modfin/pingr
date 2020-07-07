@@ -4,13 +4,14 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/jmoiron/sqlx"
+	"github.com/jmoiron/sqlx/types"
 	"pingr"
 )
 
 
 type Test struct {
 	pingr.BaseTest
-	Blob []byte `json:"blob" db:"blob"`
+	Blob types.JSONText `json:"blob" db:"blob"`
 }
 
 func GetTests(db *sqlx.DB) ([]pingr.Test, error) {

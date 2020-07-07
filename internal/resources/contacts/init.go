@@ -34,13 +34,14 @@ func Init(g *echo.Group) {
 		return context.JSON(200, contact)
 	})
 
-	g.POST("/add",func(context echo.Context) error {
+	g.POST("",func(context echo.Context) error {
 		var contact pingr.Contact
 		if err := context.Bind(&contact); err != nil {
-			return context.String(500, "Could not parse body as contact type: " + err.Error())
+			return context.String(400, "Could not parse body as contact type: " + err.Error())
 		}
-		if !contact.Validate(false) {
-			return context.String(500, "invalid input: Contact")
+		contact.ContactId = uuid.New().String()
+		if !contact.Validate() {
+			return context.String(400, "invalid input: Contact")
 		}
 		contact.ContactId = uuid.New().String()
 
@@ -53,19 +54,19 @@ func Init(g *echo.Group) {
 		return context.String(200, "contact added to db")
 	})
 
-	g.PUT("/update", func(context echo.Context) error {
+	g.PUT("", func(context echo.Context) error {
 		var contact pingr.Contact
 		if err := context.Bind(&contact); err != nil {
-			return context.String(500, "Could not parse body as contact type: " + err.Error())
+			return context.String(400, "Could not parse body as contact type: " + err.Error())
 		}
-		if !contact.Validate(true) {
-			return context.String(500, "invalid input: Contact")
+		if !contact.Validate() {
+			return context.String(400, "invalid input: Contact")
 		}
 
 		db := context.Get("DB").(*sqlx.DB)
 		_, err := dao.GetContact(contact.ContactId, db)
 		if err != nil {
-			return context.String(500, "Not a valid/active ContactId, " + err.Error())
+			return context.String(400, "Not a valid/active ContactId, " + err.Error())
 		}
 
 		err = dao.PutContact(contact, db)
@@ -76,13 +77,13 @@ func Init(g *echo.Group) {
 		return context.String(200, "contact updated")
 	})
 
-	g.DELETE("/delete/:contactId", func(context echo.Context) error {
+	g.DELETE("/:contactId", func(context echo.Context) error {
 		contactId:= context.Param("contactId")
 
 		db := context.Get("DB").(*sqlx.DB)
 		_, err := dao.GetContact(contactId, db)
 		if err != nil {
-			return context.String(500, "Not a valid/active contactId, " + err.Error())
+			return context.String(400, "Not a valid/active contactId, " + err.Error())
 		}
 
 		err = dao.DeleteContact(contactId, db)
@@ -90,16 +91,17 @@ func Init(g *echo.Group) {
 			return context.String(500, "Could not delete contact, " + err.Error())
 		}
 
-		return context.String(500, "contact deleted")
+		return context.String(200, "contact deleted")
 	})
 
 	g.POST("/test", func(c echo.Context) error {
 		var contact pingr.Contact
 		if err := c.Bind(&contact); err != nil {
-			return c.String(500, "Could not parse body as contact type: " + err.Error())
+			return c.String(400, "Could not parse body as contact type: " + err.Error())
 		}
-		if !contact.Validate(false) {
-			return c.String(500, "invalid input: Contact")
+		contact.ContactId = uuid.New().String()
+		if !contact.Validate() {
+			return c.String(400, "invalid input: Contact")
 		}
 
 		testTest := pingr.BaseTest{
@@ -126,6 +128,6 @@ func Init(g *echo.Group) {
 				return c.String(500, "an error occurred during the test: " + err.Error())
 			}
 		}
-		return c.String(200, "your test ran without error, check your contact url")
+		return c.String(200, "your test ran without error, notifications sent, check your contact url")
 	})
 }

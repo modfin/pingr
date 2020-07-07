@@ -48,10 +48,10 @@ func Init(g *echo.Group) {
 	})
 
 	// Add new Test
-	g.POST("/add", func(context echo.Context) error {
+	g.POST("", func(context echo.Context) error {
 		var testDB dao.Test
 		if err := context.Bind(&testDB); err != nil {
-			return context.String(500, "Could not parse body as test type: " + err.Error())
+			return context.String(400, "Could not parse body as test type: " + err.Error())
 		}
 
 		testDB.CreatedAt = time.Now()
@@ -59,10 +59,10 @@ func Init(g *echo.Group) {
 
 		pTest, err := testDB.Parse()
 		if err != nil {
-			return context.String(500,"Could not parse test data: " + err.Error())
+			return context.String(400,"Could not parse test data: " + err.Error())
 		}
-		if !pTest.Validate(false) {
-			return context.String(500,"invalid input: Test")
+		if !pTest.Validate() {
+			return context.String(400,"invalid input: Test")
 		}
 
 		db := context.Get("DB").(*sqlx.DB)
@@ -71,16 +71,16 @@ func Init(g *echo.Group) {
 			return context.String(500, "Could not add Test to DB, " +  err.Error())
 		}
 
-		scheduler.NotifyNewTest()
+		scheduler.NotifyNewTest(pTest)
 
 		return context.String(200, "Test added to DB")
 	})
 
 	// Update Test
-	g.PUT("/update", func(context echo.Context) error {
+	g.PUT("", func(context echo.Context) error {
 		var testDB dao.Test
 		if err := context.Bind(&testDB); err != nil {
-			return context.String(500, "Could not parse body as test type")
+			return context.String(400, "Could not parse body as test type")
 		}
 
 		testDB.CreatedAt = time.Now()
@@ -89,14 +89,14 @@ func Init(g *echo.Group) {
 		if err != nil {
 			return err
 		}
-		if !pTest.Validate(true) {
-			return context.String(500,"invalid input: Test")
+		if !pTest.Validate() {
+			return context.String(400,"invalid input: Test")
 		}
 
 		db := context.Get("DB").(*sqlx.DB)
 		_, err = dao.GetTest(testDB.TestId, db)
 		if err != nil {
-			return context.String(500, "Not a valid/active testId, " + err.Error())
+			return context.String(400, "Not a valid/active testId, " + err.Error())
 		}
 
 		err = dao.PutTest(testDB, db)
@@ -104,19 +104,19 @@ func Init(g *echo.Group) {
 			return context.String(500, "Could not update Test, " + err.Error())
 		}
 
-		scheduler.NotifyUpdatedTest(pTest)
+		scheduler.NotifyNewTest(pTest)
 
 		return context.JSON(200, pTest)
 	})
 
 	// Delete Test
-	g.DELETE("/delete/:testId", func(context echo.Context) error {
+	g.DELETE("/:testId", func(context echo.Context) error {
 		testId:= context.Param("testId")
 
 		db := context.Get("DB").(*sqlx.DB)
 		_, err := dao.GetTest(testId, db)
 		if err != nil {
-			return context.String(500, "Not a valid/active testId, " + err.Error())
+			return context.String(400, "Not a valid/active testId, " + err.Error())
 		}
 
 		err = dao.DeleteTest(testId, db)
@@ -131,30 +131,31 @@ func Init(g *echo.Group) {
 
 		scheduler.NotifyDeletedTest(testId)
 
-		return context.String(500, "Test deleted")
+		return context.String(200, "Test deleted")
 	})
 
 	g.POST("/test", func(c echo.Context) error {
 		var testDB dao.Test
 		if err := c.Bind(&testDB); err != nil {
-			return c.String(500, "Could not parse body as test type: " + err.Error())
+			return c.String(400, "Could not parse body as test type: " + err.Error())
 		}
 
 		testDB.CreatedAt = time.Now()
+		testDB.TestId = uuid.New().String()
 
 		pTest, err := testDB.Parse()
 		if err != nil {
-			return c.String(500,"Could not parse test data: " + err.Error())
+			return c.String(400,"Could not parse test data: " + err.Error())
 		}
-		if !pTest.Validate(false) {
-			return c.String(500,"invalid input: Test")
+		if !pTest.Validate() {
+			return c.String(400,"invalid input: Test")
 		}
 
 		rt, err := pTest.RunTest()
 		if err != nil {
-			return c.String(400, "test failed: " + err.Error())
+			return c.String(200, "test failed: " + err.Error())
 		}
-		return c.String(200, "test succeeded. response time: " + string(rt))
+		return c.String(200, "test succeeded. response time: " + rt.Round(time.Millisecond).String())
 	})
 
 }

@@ -30,29 +30,29 @@ func Init(g *echo.Group) {
 		return context.JSON(200, jContacts)
 	})
 
-	g.POST("/add",func(context echo.Context) error {
+	g.POST("",func(context echo.Context) error {
 		var contacts []pingr.TestContact
 		if err := context.Bind(&contacts); err != nil {
-			return context.String(500, "Could not parse body as test contact type: " + err.Error())
+			return context.String(400, "Could not parse body as test contact type: " + err.Error())
 		}
 		if len(contacts) == 0 {
-			return context.String(500, "Could not parse body as test contact type")
+			return context.String(400, "Could not parse body as test contact type")
 		}
 
 		db := context.Get("DB").(*sqlx.DB)
 
 		for _, contact := range contacts {
 			if !contact.Validate() {
-				return context.String(500, "invalid input: TestContact")
+				return context.String(400, "invalid input: TestContact")
 			}
 
 			_, err := dao.GetTest(contact.TestId, db)
 			if err != nil {
-				return context.String(500, "no matching test id")
+				return context.String(400, "no matching test id or/and contact id")
 			}
 			_, err = dao.GetContact(contact.ContactId, db)
 			if err != nil {
-				return context.String(500, "no matching contact id")
+				return context.String(400, "no matching test id or/and contact id")
 			}
 
 			err = dao.PostTestContact(contact, db)
@@ -64,13 +64,13 @@ func Init(g *echo.Group) {
 		return context.String(200, "test contacts added to db")
 	})
 
-	g.DELETE("/delete/:testId", func(context echo.Context) error {
+	g.DELETE("/:testId", func(context echo.Context) error {
 		testId:= context.Param("testId")
 
 		db := context.Get("DB").(*sqlx.DB)
 		_, err := dao.GetTestContacts(testId, db)
 		if err != nil {
-			return context.String(500, "Not a valid/active testId: " + err.Error())
+			return context.String(400, "Not a valid/active testId: " + err.Error())
 		}
 
 		err = dao.DeleteTestContacts(testId, db)
@@ -78,17 +78,17 @@ func Init(g *echo.Group) {
 			return context.String(500, "Could not delete test contacts: " + err.Error())
 		}
 
-		return context.String(500, "test contacts deleted")
+		return context.String(200, "test contacts deleted")
 	})
 
-	g.DELETE("/delete/:testId/:contactId", func(context echo.Context) error {
+	g.DELETE("/:testId/:contactId", func(context echo.Context) error {
 		testId:= context.Param("testId")
 		contactId:= context.Param("contactId")
 
 		db := context.Get("DB").(*sqlx.DB)
 		_, err := dao.GetTestContacts(testId, db)
 		if err != nil {
-			return context.String(500, "Not a valid/active testId: " + err.Error())
+			return context.String(400, "Not a valid/active testId: " + err.Error())
 		}
 
 		err = dao.DeleteTestContact(testId, contactId, db)
@@ -96,6 +96,6 @@ func Init(g *echo.Group) {
 			return context.String(500, "Could not delete test contact: " + err.Error())
 		}
 
-		return context.String(500, "test contact deleted")
+		return context.String(200, "test contact deleted")
 	})
 }

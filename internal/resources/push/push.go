@@ -16,7 +16,7 @@ func Init(g *echo.Group) {
 
 		_, err := dao.GetTest(testId, db)
 		if err != nil {
-			return context.String(500, "invalid testId")
+			return context.String(400, "invalid testId")
 		}
 
 		err = scheduler.NotifyPushTest(testId, nil)
@@ -33,7 +33,7 @@ func Init(g *echo.Group) {
 
 		_, err := dao.GetTest(testId, db)
 		if err != nil {
-			return context.String(500, "invalid testId")
+			return context.String(400, "invalid testId")
 		}
 
 		reqBody, err := ioutil.ReadAll(context.Request().Body)

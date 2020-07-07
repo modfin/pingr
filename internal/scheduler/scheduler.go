@@ -31,16 +31,14 @@ const (
 )
 
 var (
-	muTests 				sync.RWMutex
+	muTests 			sync.RWMutex
 
 	tests 				= make(map[string] pingr.Test)
 	closeChans 			= make(map[string] chan int)
 
-	newTestChan          = make(chan pingr.Test, 10) // To be discussed
-	deletedTestChan      = make(chan string, 10)
+	newTestChan         = make(chan pingr.Test, 10) // To be discussed
+	deletedTestChan     = make(chan string, 10)
 	statusChan          = make(chan testStatus, 10)
-	logChan             = make(chan pingr.Log)
-	notifyDBHandler     = make(chan int, 10)
 	timeForTimeoutCheck = make(chan int)
 )
 
@@ -51,13 +49,13 @@ type testStatus struct {
 }
 
 func Scheduler(db *sqlx.DB) {
-	initVars(db)
-
 	go discSpaceMaintainer(db)
 
 	go dataBaseListener(db) // Best way to handle DB error??
 
 	go testMaintainer(db)
+
+	initVars(db)
 
 	for {
 		select {
@@ -313,7 +311,6 @@ func dataBaseListener(db *sqlx.DB) {
 	for {
 		select {
 			case <-time.After(DataBaseListenerInterval):
-			case <-notifyDBHandler:
 		}
 		log.Info("Looking for new/updated tests in DB")
 		testsDB, err := dao.GetTests(db)
@@ -378,7 +375,7 @@ func addTestLog(testId string, statusCode uint, rt time.Duration, err error, db 
 	if err != nil {
 		logMessage = err.Error()
 	}
-	log.Info(fmt.Sprintf("TestID: %d, StatusCode: %d", testId, statusCode))
+	log.Info(fmt.Sprintf("TestID: %s, StatusCode: %d", testId, statusCode))
 	l := pingr.Log{
 		TestId:     		testId,
 		StatusId:  		statusCode,
@@ -417,11 +414,7 @@ func discSpaceMaintainer(db *sqlx.DB) {
 
 }
 
-func NotifyNewTest() {
-	notifyDBHandler <- 1
-}
-
-func NotifyUpdatedTest(test pingr.Test) {
+func NotifyNewTest(test pingr.Test) {
 	newTestChan <- test
 }
 
