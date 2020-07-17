@@ -52,4 +52,5 @@ RUN curl -sL https://deb.nodesource.com/setup_12.x | bash - \
 WORKDIR /go/src/pingr
 
 # run fswatch
-CMD ./start.sh
+#CMD ./start.sh
+CMD fswatch -config /fsw.yml

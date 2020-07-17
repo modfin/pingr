@@ -94,7 +94,7 @@ func Scheduler(db *sqlx.DB) {
 				muTests.Lock()
 				if _, ok := tests[deletedTestId]; ok {
 					delete(tests, deletedTestId)
-					log.Info(fmt.Sprintf("TestID: %d, Test deleted", deletedTestId))
+					log.Info(fmt.Sprintf("TestID: %s, Test deleted", deletedTestId))
 				}
 				muTests.Unlock()
 			case <-time.After(TestTimeoutCheckInterval):

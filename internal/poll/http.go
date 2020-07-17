@@ -3,12 +3,13 @@ package poll
 import (
 	"bytes"
 	"errors"
+	"github.com/jmoiron/sqlx/types"
 	"io/ioutil"
 	"net/http"
 	"time"
 )
 
-func HTTP(hostname string, method string, to time.Duration, payload []byte, expRes []byte) (time.Duration, error) {
+func HTTP(hostname string, method string, to time.Duration, payload types.JSONText, expRes types.JSONText) (time.Duration, error) {
 	client := http.Client{Timeout: to}
 	start := time.Now()
 	req, err := http.NewRequest(method, hostname, bytes.NewBuffer(payload))

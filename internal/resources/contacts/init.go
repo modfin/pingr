@@ -106,7 +106,7 @@ func Init(g *echo.Group) {
 
 		testTest := pingr.BaseTest{
 			TestId:    "test-uuid-1234",
-			TestName:  "<Your-test-name>",
+			TestName:  "<test-name>",
 			Timeout:   120,
 			Url:       "some-url.com",
 			Interval:  10,

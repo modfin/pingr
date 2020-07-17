@@ -17,6 +17,7 @@ type Test struct {
 func GetTests(db *sqlx.DB) ([]pingr.Test, error) {
 	q := `
 		SELECT * FROM tests
+		ORDER BY test_name
 	`
 	var tests []Test
 	err := db.Select(&tests, q)
@@ -126,10 +127,6 @@ func (j Test) Parse() (parsedTest pingr.Test, err error) {
 	case "Ping":
 		var t pingr.PingTest
 		t.BaseTest = j.BaseTest
-		err = json.Unmarshal(j.Blob, &t)
-		if err != nil {
-			return
-		}
 		parsedTest = t
 	case "HTTP":
 		var t pingr.HTTPTest

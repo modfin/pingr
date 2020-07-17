@@ -59,7 +59,7 @@ func Prometheus(testId string, body []byte, metricTests []MetricTest) error {
 			case "GAUGE":
 				promValue := *keyMetric.Gauge.Value
 				if metricTest.LowerBound > promValue || promValue > metricTest.UpperBound {
-					return errors.New(fmt.Sprintf("expected key: %s GAUGE to be between %f and %f got: %f", metricTest.Key, metricTest.LowerBound, metricTest.UpperBound, promValue))
+					return errors.New(fmt.Sprintf("expected key: %s GAUGE to be between %.3f and %.3f got: %.3f", metricTest.Key, metricTest.LowerBound, metricTest.UpperBound, promValue))
 				}
 			case "COUNTER":
 				mu.Lock()
@@ -75,7 +75,7 @@ func Prometheus(testId string, body []byte, metricTests []MetricTest) error {
 				prevPromValues[hashedMetric] = promValue
 				if promValueIncrease < metricTest.LowerBound || promValueIncrease > metricTest.UpperBound {
 					mu.Unlock()
-					return errors.New(fmt.Sprintf("expected key: %s COUNTER to increase between %f and %f got: %f", metricTest.Key, metricTest.LowerBound, metricTest.UpperBound, promValueIncrease))
+					return errors.New(fmt.Sprintf("expected key: %s COUNTER to increase between %.3f and %.3f got: %.3f", metricTest.Key, metricTest.LowerBound, metricTest.UpperBound, promValueIncrease))
 				}
 				mu.Unlock()
 			}

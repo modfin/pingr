@@ -12,6 +12,9 @@ services:
     environment:
       DEV: |-
         true
+      SMTP_HOST: "smtp.gmail.com"
+      SMTP_USERNAME: "pingrman@gmail.com"
+      SMTP_PASSWORD: "2KPy8WJr2uLC46g"
     ports:
     - "8080:8080"
     volumes:

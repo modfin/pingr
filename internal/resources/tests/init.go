@@ -47,6 +47,19 @@ func Init(g *echo.Group) {
 		return context.JSON(200, logs)
 	})
 
+	// Get a Test's Logs limited
+	g.GET("/:testId/logs/:days", func(context echo.Context) error {
+		db := context.Get("DB").(*sqlx.DB)
+		testId:= context.Param("testId")
+		days:= context.Param("days")
+
+		logs, err := dao.GetTestLogsDaysLimited(testId, days, db)
+		if err != nil {
+			return context.String(500, "Failed to get the test's logs, " + err.Error())
+		}
+		return context.JSON(200, logs)
+	})
+
 	// Add new Test
 	g.POST("", func(context echo.Context) error {
 		var testDB dao.Test
@@ -73,7 +86,7 @@ func Init(g *echo.Group) {
 
 		scheduler.NotifyNewTest(pTest)
 
-		return context.String(200, "Test added to DB")
+		return context.JSON(200, pTest)
 	})
 
 	// Update Test

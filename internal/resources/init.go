@@ -29,16 +29,17 @@ func Init(closing <-chan struct{}, db *sqlx.DB) {
 	e.Use(logging.EchoMiddleware(nil))
 	e.Use(logging.GetDBMiddleware(db))
 	e.Use(middleware.Recover())
+	e.Use(middleware.CORS())
 
 	health.SetMetrics(e)
-	health.Init(closing, e.Group("health"))
+	health.Init(closing, e.Group("api/health"))
 
-	tests.Init(e.Group("tests"))
-	logs.Init(e.Group("logs"))
-	contacts.Init(e.Group("contacts"))
-	testcontacts.Init(e.Group("testcontacts"))
+	tests.Init(e.Group("api/tests"))
+	logs.Init(e.Group("api/logs"))
+	contacts.Init(e.Group("api/contacts"))
+	testcontacts.Init(e.Group("api/testcontacts"))
 
-	push.Init(e.Group("push"))
+	push.Init(e.Group("api/push"))
 
 	// UI
 	e.GET("/*", func(c echo.Context) error {
@@ -56,6 +57,7 @@ func Init(closing <-chan struct{}, db *sqlx.DB) {
 		name := filepath.Join("build", path.Clean(p))
 		data, err := ui.Asset(name)
 		if  err != nil{
+
 			return err
 		}
 		return c.Blob(200, http.DetectContentType(data), data)

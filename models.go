@@ -9,12 +9,12 @@ import (
 )
 
 type Log struct {
-	LogId     		uint64			`db:"log_id"`
-	TestId     		string			`db:"test_id"`
-	StatusId  		uint			`db:"status_id"`
-	Message   		string
-	ResponseTime 	time.Duration	`db:"response_time"`
-	CreatedAt 		time.Time		`db:"created_at"`
+	LogId     		uint64			`json:"log_id" db:"log_id"`
+	TestId     		string			`json:"test_id" db:"test_id"`
+	StatusId  		uint			`json:"status_id" db:"status_id"`
+	Message   		string			`json:"message" db:"message"`
+	ResponseTime 	time.Duration	`json:"response_time" db:"response_time"`
+	CreatedAt 		time.Time		`json:"created_at" db:"created_at"`
 }
 
 type Contact struct {
@@ -70,11 +70,11 @@ type Test interface {
 type BaseTest struct {
 	TestId		string			`json:"test_id" db:"test_id"`
 	TestName	string 			`json:"test_name" db:"test_name"`
+	TestType 	string			`json:"test_type" db:"test_type"`
 	Timeout 	time.Duration 	`json:"timeout"`
 	Url 		string 			`json:"url"`
 	Interval 	time.Duration 	`json:"interval"`
 	CreatedAt	time.Time		`json:"created_at" db:"created_at"`
-	TestType 	string			`json:"test_type" db:"test_type"`
 }
 
 func (j BaseTest) Validate() bool {

@@ -75,6 +75,23 @@ func GetTestLogsLimited(id string, limit int, db *sqlx.DB) ([]FullLog, error) {
 	return logs, nil
 }
 
+func GetTestLogsDaysLimited(id string, days string, db *sqlx.DB) ([]pingr.Log, error) {
+	q := `
+		SELECT * FROM logs
+		WHERE test_id = $1
+		AND created_at > datetime('now', '-'||$2||' days')
+		ORDER BY created_at DESC
+	`
+	var logs []pingr.Log
+
+	err := db.Select(&logs, q, id, days)
+	if err != nil {
+		return nil, err
+	}
+
+	return logs, nil
+}
+
 func PostLog(log pingr.Log, db *sqlx.DB) error {
 	q := `
 		INSERT INTO logs(test_id, status_id, message, response_time, created_at) 

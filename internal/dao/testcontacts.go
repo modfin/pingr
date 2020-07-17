@@ -6,10 +6,11 @@ import (
 )
 
 type TestContactType struct {
-	ContactId 	string 	`db:"contact_id"`
-	ContactType string 	`db:"contact_type"`
-	ContactUrl 	string 	`db:"contact_url"`
-	Threshold	uint 	`db:"threshold"`
+	ContactId 	string 	`json:"contact_id" db:"contact_id"`
+	ContactName	string 	`json:"contact_name" db:"contact_name"`
+	ContactType string 	`json:"contact_type" db:"contact_type"`
+	ContactUrl 	string 	`json:"contact_url" db:"contact_url"`
+	Threshold	uint 	`json:"threshold" db:"threshold"`
 }
 
 func GetAllTestContacts(db *sqlx.DB) ([]pingr.TestContact, error) {
@@ -25,13 +26,13 @@ func GetAllTestContacts(db *sqlx.DB) ([]pingr.TestContact, error) {
 	return contacts, nil
 }
 
-func GetTestContacts(id string, db *sqlx.DB) (pingr.TestContact, error) {
+func GetTestContacts(id string, db *sqlx.DB) ([]pingr.TestContact, error) {
 	q := `
 		SELECT * FROM test_contacts 
 		WHERE test_id = $1
 	`
-	var c pingr.TestContact
-	err := db.Get(&c, q, id)
+	var c []pingr.TestContact
+	err := db.Select(&c, q, id)
 	if err != nil {
 		return c, err
 	}
@@ -41,7 +42,7 @@ func GetTestContacts(id string, db *sqlx.DB) (pingr.TestContact, error) {
 
 func GetTestContactsType(id string, db *sqlx.DB) ([]TestContactType, error) {
 	q := `
-		SELECT c.contact_id, c.contact_type, c.contact_url, jc.threshold FROM test_contacts jc
+		SELECT c.contact_id, c.contact_name, c.contact_type, c.contact_url, jc.threshold FROM test_contacts jc
 		INNER JOIN contacts c ON jc.contact_id = c.contact_id
 		WHERE jc.test_id = $1
 	`
