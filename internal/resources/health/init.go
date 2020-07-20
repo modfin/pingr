@@ -3,7 +3,6 @@ package health
 import (
 	"github.com/labstack/echo-contrib/prometheus"
 	"github.com/labstack/echo/v4"
-	"pingr/internal/metrics"
 )
 
 func SetMetrics(e *echo.Echo) {
@@ -15,7 +14,6 @@ func SetMetrics(e *echo.Echo) {
 func Init(closing <-chan struct{}, g *echo.Group) {
 
 	g.GET("/ping", func(context echo.Context) error {
-		metrics.HealthCheckInc()
 		return context.String(200, "pong")
 	})
 }

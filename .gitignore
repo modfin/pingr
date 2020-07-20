@@ -1,3 +1,11 @@
 .idea
 .env
+*.db
 *.sqlite
+node_modules
+.cache
+ui/lib
+*.bs.js
+*.log
+ui/build
+ui/dist

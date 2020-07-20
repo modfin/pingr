@@ -1,13 +1,17 @@
 package main
 
 import (
-	"pingr/internal/config"
-	"pingr/internal/logging"
-	"pingr/internal/resources"
 	"context"
+	_ "github.com/mattn/go-sqlite3"
 	log "github.com/sirupsen/logrus"
 	"os"
 	"os/signal"
+	"pingr/internal/bus"
+	"pingr/internal/config"
+	"pingr/internal/dao"
+	"pingr/internal/logging"
+	"pingr/internal/resources"
+	"pingr/internal/scheduler"
 	"syscall"
 	"time"
 )
@@ -25,10 +29,24 @@ func main() {
 
 	log.WithField("pid", os.Getpid()).Info("Starting pingr")
 
-	resources.Init(closing)
+	db, err := dao.InitDB()
+	if err != nil {
+		log.Fatal("Could not load the database: ", err)
+	}
+	defer db.Close()
+	log.WithField("pid", os.Getpid()).Info("DB initialized")
+
+	buz := bus.New()
+
+	log.WithField("pid", os.Getpid()).Info("Starting scheduler")
+
+	_ = scheduler.New(db, buz)
+
+	resources.Init(closing, db, buz)
 
 	log.Info("Terminating service")
 }
+
 
 func signaling(cancel context.CancelFunc) {
 	signals := make(chan os.Signal, 1)
@@ -58,3 +76,5 @@ func signaling(cancel context.CancelFunc) {
 		}
 	}
 }
+
+

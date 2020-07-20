@@ -1,0 +1,13 @@
+type t;
+[@bs.module] external default: t = "highcharts";
+
+[@bs.module] external data: t => unit = "highcharts/modules/data";
+[@bs.module] external heatmap: t => unit = "highcharts/modules/heatmap";
+[@bs.module] external bar: t => unit = "highcharts/modules/bar";
+[@bs.module]
+external boostCanvas: t => unit = "highcharts/modules/boost-canvas";
+[@bs.module] external boost: t => unit = "highcharts/modules/boost";
+
+[@bs.send] external dateFormat: (t, string, float) => string;
+
+module Options = Highcharts__Options;

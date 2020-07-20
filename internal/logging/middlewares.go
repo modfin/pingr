@@ -3,6 +3,7 @@ package logging
 import (
 	"context"
 	"github.com/google/uuid"
+	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/sirupsen/logrus"
@@ -74,6 +75,15 @@ func RequestIdMiddleware() echo.MiddlewareFunc {
 			c.SetRequest(c.Request().WithContext(ctx))
 			c.Set("request_id", requestId)
 
+			return next(c)
+		}
+	}
+}
+
+func GetDBMiddleware(db *sqlx.DB) echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) (err error) {
+			c.Set("DB", db)
 			return next(c)
 		}
 	}

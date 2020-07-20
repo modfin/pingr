@@ -1,4 +1,4 @@
-package ping
+package poll
 
 import (
 	"bytes"
@@ -14,14 +14,15 @@ import (
 	"time"
 )
 
-func TLS(hostname string, port string) error {
+func TLS(hostname string, port string, timeOut time.Duration) (time.Duration, error) {
 
 	now := time.Now()
 	then := now.AddDate(0, 1, 0)
 
-	netconn, err := net.Dial("tcp", fmt.Sprintf("%s:%s", hostname, port))
+	dialer := net.Dialer{Timeout: timeOut*time.Second}
+	netconn, err := dialer.Dial("tcp", fmt.Sprintf("%s:%s", hostname, port))
 	if err != nil {
-		return err
+		return time.Since(now), err
 	}
 	defer netconn.Close()
 
@@ -31,12 +32,12 @@ func TLS(hostname string, port string) error {
 
 	err = cli.Handshake()
 	if err != nil {
-		return err
+		return time.Since(now), err
 	}
 
 	err = cli.VerifyHostname(hostname)
 	if err != nil {
-		return err
+		return time.Since(now), err
 	}
 
 	//// Upgrading to go1.14 is probably preferable in order to do better inspection of CipherSuites
@@ -47,10 +48,12 @@ func TLS(hostname string, port string) error {
 	suite := GetCipherSuite(state.CipherSuite)
 
 	if suite == nil{
-		return fmt.Errorf("could not find valid cipher suite for %d", state.CipherSuite)
+		err = fmt.Errorf("could not find valid cipher suite for %d", state.CipherSuite)
+		return time.Since(now), err
 	}
 	if suite.Insecure {
-		return fmt.Errorf("an insecure cipher suite is used, %s", suite.Name)
+		err = fmt.Errorf("an insecure cipher suite is used, %s", suite.Name)
+		return time.Since(now), err
 
 	}
 
@@ -60,23 +63,28 @@ func TLS(hostname string, port string) error {
 	}
 	for _, cert := range certs {
 		if now.Before(cert.NotBefore) {
-			return fmt.Errorf("cetificat is not yet valid: %s", cert.Subject.String())
+			err = fmt.Errorf("cetificat is not yet valid: %s", cert.Subject.String())
+			return time.Since(now), err
 		}
 		if then.After(cert.NotAfter) {
-			return fmt.Errorf("cetificat will expire in %s: %s", cert.NotAfter.Sub(now).String(), cert.Subject.String())
+			err = fmt.Errorf("cetificat will expire in %s: %s", cert.NotAfter.Sub(now).String(), cert.Subject.String())
+			return time.Since(now), err
 		}
 
 		if !cert.IsCA {
 			issuer, ok := named[cert.Issuer.String()]
 			if !ok {
-				return fmt.Errorf("could not find issuer for %s", cert.Subject.String())
+				err = fmt.Errorf("could not find issuer for %s", cert.Subject.String())
+				return time.Since(now), err
 			}
-			res, err := GetOCSP(cert, issuer)
+			var res *ocsp.Response
+			res, err = GetOCSP(cert, issuer)
 			if err != nil {
-				return err
+				return time.Since(now), err
 			}
 			if res.Status == ocsp.Revoked {
-				return fmt.Errorf("certificate has been revoked by issuer")
+				err = fmt.Errorf("certificate has been revoked by issuer")
+				return time.Since(now), err
 			}
 		}
 
@@ -88,7 +96,7 @@ func TLS(hostname string, port string) error {
 		//fmt.Println("        ca:", cert.IsCA)
 	}
 
-	return nil
+	return time.Since(now), err
 }
 
 func GetOCSP(clientCert, issuerCert *x509.Certificate) (res *ocsp.Response, err error) {

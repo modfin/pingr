@@ -1,11 +1,11 @@
-package ping
+package poll
 
 import (
 	"testing"
 )
 
 func TestTLS(t *testing.T) {
-	err := TLS("golang.org", "https")
+	_, err := TLS("golang.org", "https", 1)
 	if err != nil{
 		t.Log(err)
 		t.Fail()
@@ -96,7 +96,7 @@ var badTLS = []struct {
 		port: "https",
 		exp:"remote error: tls: handshake failure",
 	},
-	//{ // TODO implment check for this
+	//{ // TODO implement check for this
 	//	host: "no-sct.badssl.com",
 	//	port: "https",
 	//	exp:"remote error: tls: handshake failure",
@@ -107,7 +107,7 @@ var badTLS = []struct {
 
 func TestBadTLS(t *testing.T){
 	for _, test := range badTLS{
-		err := TLS(test.host, test.port)
+		_, err := TLS(test.host, test.port, 1)
 		if err == nil{
 			t.Log("Expected error for", test)
 			t.Fail()

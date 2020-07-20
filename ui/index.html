@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Pingr</title>
+</head>
+<body>
+  <script>
+    // stub a variable ReactJS checks. ReactJS assumes you're using a bundler, NodeJS or similar system that provides it the `process.env.NODE_ENV` variable.
+    window.process = {
+      env: {
+        NODE_ENV: 'development'
+      }
+    };
+  </script>
+  <div id="root" />
+  <!-- Our little watcher. Super clean. Check it out! -->
+  <script src="./src/Index.re"></script>
+</body>
+</html>
