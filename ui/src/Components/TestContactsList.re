@@ -39,8 +39,11 @@ let make = (~testId) => {
     </div>
     {switch (state) {
      | Loading =>
-       <div className="h-screen"> {ReasonReact.string("Loading...")} </div>
-     | Failed(msg) => <div> {ReasonReact.string(msg)} </div>
+       <div className="h-screen p-2">
+         {ReasonReact.string("Loading...")}
+       </div>
+
+     | Failed(msg) => <div className="p-2"> {ReasonReact.string(msg)} </div>
      | Success(testContacts) =>
        <table className="table-auto text-left mx-2">
          <thead>

@@ -73,7 +73,9 @@ let make = (~id) => {
   | {test: Success(test), testContacts: Success(testContacts)} =>
     <>
       <div className="relative bg-gray-400 my-4 p-1">
-        <p className="text-xl font-bold"> {"Edit test" |> React.string} </p>
+        <p className="text-xl font-bold ml-2">
+          {"Edit test" |> React.string}
+        </p>
       </div>
       <TestForm
         submitTest=Api.putTest
@@ -85,7 +87,9 @@ let make = (~id) => {
   | {test: Success(test), _} =>
     <>
       <div className="relative bg-gray-400 my-4 p-1">
-        <p className="text-xl font-bold"> {"Edit test" |> React.string} </p>
+        <p className="text-xl font-bold ml-2">
+          {"Edit test" |> React.string}
+        </p>
       </div>
       <TestForm
         submitTest=Api.putTest

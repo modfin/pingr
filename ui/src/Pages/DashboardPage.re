@@ -3,7 +3,7 @@ let options =
     make(
       ~title=Title.make(~text=Some("Response times"), ()),
       ~series=[|
-        Series.column(~data=[|1, 2, 3, 4|], ~name="Response time", ()),
+        Series.column(~data=[|1., 2., 3., 4.|], ~name="Response time", ()),
       |],
       ~xAxis=
         Axis.make(

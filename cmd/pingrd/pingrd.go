@@ -6,6 +6,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"os"
 	"os/signal"
+	"pingr/internal/bus"
 	"pingr/internal/config"
 	"pingr/internal/dao"
 	"pingr/internal/logging"
@@ -35,11 +36,13 @@ func main() {
 	defer db.Close()
 	log.WithField("pid", os.Getpid()).Info("DB initialized")
 
+	buz := bus.New()
+
 	log.WithField("pid", os.Getpid()).Info("Starting scheduler")
-	go scheduler.Scheduler(db)
 
-	resources.Init(closing, db)
+	_ = scheduler.New(db, buz)
 
+	resources.Init(closing, db, buz)
 
 	log.Info("Terminating service")
 }

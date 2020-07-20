@@ -1,33 +1,29 @@
 package dao
 
 import (
-	"encoding/json"
-	"errors"
 	"github.com/jmoiron/sqlx"
-	"github.com/jmoiron/sqlx/types"
 	"pingr"
 )
 
 
-type Test struct {
-	pingr.BaseTest
-	Blob types.JSONText `json:"blob" db:"blob"`
-}
-
-func GetTests(db *sqlx.DB) ([]pingr.Test, error) {
+func GetRawTests(db *sqlx.DB) ([]pingr.GenericTest, error) {
 	q := `
 		SELECT * FROM tests
 		ORDER BY test_name
 	`
-	var tests []Test
+	var tests []pingr.GenericTest
 	err := db.Select(&tests, q)
+	return tests, err
+}
+
+func GetTests(db *sqlx.DB) ([]pingr.Test, error) {
+	tests, err := GetRawTests(db)
 	if err != nil {
 		return nil, err
 	}
-
 	var parsedTests []pingr.Test
 	for _, j := range tests {
-		pTest, err := j.Parse()
+		pTest, err := j.Impl()
 		if err != nil {
 			return nil, err
 		}
@@ -37,22 +33,29 @@ func GetTests(db *sqlx.DB) ([]pingr.Test, error) {
 	return parsedTests, nil
 }
 
-func GetTest(id string, db *sqlx.DB) (_test pingr.Test, err error) {
+func GetRawTest(id string, db *sqlx.DB) (test pingr.GenericTest, err error) {
 	q := `
 		SELECT * FROM tests 
 		WHERE test_id = $1
 	`
-	var j Test
-	err = db.Get(&j, q, id)
+	err = db.Get(&test, q, id)
 	if err != nil {
 		return
 	}
 
-	_test, err = j.Parse()
 	return
 }
 
-func PostTest(test Test, db *sqlx.DB) error {
+func GetTest(id string, db *sqlx.DB) (test pingr.Test, err error) {
+	t, err := GetRawTest(id, db)
+	if err != nil {
+		return
+	}
+	test, err = t.Impl()
+	return
+}
+
+func PostTest(test pingr.GenericTest, db *sqlx.DB) error {
 	q := `
 		INSERT INTO tests(test_id, test_name, test_type, url, interval, timeout, created_at, blob) 
 		VALUES (:test_id,:test_name,:test_type,:url,:interval,:timeout,:created_at,:blob);
@@ -65,7 +68,7 @@ func PostTest(test Test, db *sqlx.DB) error {
 	return nil
 }
 
-func PutTest(test Test,  db *sqlx.DB)  error {
+func PutTest(test pingr.GenericTest,  db *sqlx.DB)  error {
 	q := `
 		UPDATE tests 
 		SET test_name = :test_name,
@@ -97,7 +100,7 @@ func DeleteTest(id string,  db *sqlx.DB) error {
 
 	return nil
 }
-
+/*
 func (j Test) Parse() (parsedTest pingr.Test, err error) {
 	switch j.TestType {
 	case "SSH":
@@ -172,4 +175,4 @@ func (j Test) Parse() (parsedTest pingr.Test, err error) {
 		err = errors.New(j.TestType + " is not a valid test type")
 	}
 	return
-}
+}*/

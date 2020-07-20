@@ -42,7 +42,9 @@ let make = () => {
   });
   <>
     <div className="relative bg-gray-400 my-4 p-1">
-      <p className="text-xl font-bold"> {"Active tests" |> React.string} </p>
+      <p className="text-xl font-bold ml-1">
+        {"Active tests" |> React.string}
+      </p>
       <button
         onClick={_event => Paths.goToNewTest()}
         className="m-1 bg-green-500 hover:bg-green-700 text-white py-1 px-2 rounded">
@@ -53,7 +55,7 @@ let make = () => {
      | Loading => <div> {ReasonReact.string("Loading...")} </div>
      | Failed(msg) => <div> {ReasonReact.string(msg)} </div>
      | Success(tests) =>
-       <table className="table-auto text-left">
+       <table className="table-auto text-left mx-2">
          <thead>
            <tr>
              <th className="px-4 py-2"> {"Name" |> React.string} </th>

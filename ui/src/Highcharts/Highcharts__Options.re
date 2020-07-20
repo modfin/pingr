@@ -83,12 +83,12 @@ module Series = {
     ) =>
     t;
 
-  /** Creates a `heatmap` series */
+  /** Creates a `column` series */
   [@bs.obj]
   external column:
     (
       ~_type: [@bs.as "column"] _,
-      ~data: array(int)=?,
+      ~data: array(float)=?,
       ~colorByPoint: bool=?,
       ~colors: array(string)=?,
       ~name: string=?,

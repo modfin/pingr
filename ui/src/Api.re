@@ -88,8 +88,7 @@ let fetchLogsWithCallback = (~id=?, callback, ~numDays=?, ()) => {
     p
     ++ (
       switch (id, numDays) {
-      | (None, None) => "/logs"
-      | (None, Some(_)) => "/logs"
+      | (None, _) => "/logs"
       | (Some(id), None)
       | (Some(id), Some("0")) => "/tests/" ++ id ++ "/logs"
       | (Some(id), Some(days)) => "/tests/" ++ id ++ "/logs/" ++ days
@@ -118,15 +117,22 @@ let fetchTestContactsWithCallback = (id, callback) => {
   );
 };
 
+let fetchJSONResponse = res => {
+  Fetch.Response.ok(res)
+    ? Fetch.Response.json(res)
+    : Js.Exn.raiseError(Fetch.Response.statusText(res));
+};
+let fetchTextResponse = res => {
+  Fetch.Response.ok(res)
+    ? Fetch.Response.text(res)
+    : Js.Exn.raiseError(Fetch.Response.statusText(res));
+};
+
 let postTest = (payload, callback) => {
   let path = p ++ "/tests";
   Js.Promise.(
     JsonTransport.post(path, payload)
-    |> then_(res =>
-         Fetch.Response.ok(res)
-           ? Fetch.Response.json(res)
-           : Js.Exn.raiseError(Fetch.Response.statusText(res))
-       )
+    |> then_(res => res |> fetchJSONResponse)
     |> then_(response => callback(SuccessJSON(response)) |> resolve)
     |> catch(e => callback(Error([%bs.raw "e.message"])) |> resolve)
     |> ignore
@@ -137,11 +143,7 @@ let putTest = (payload, callback) => {
   let path = p ++ "/tests";
   Js.Promise.(
     JsonTransport.put(path, payload)
-    |> then_(res =>
-         Fetch.Response.ok(res)
-           ? Fetch.Response.json(res)
-           : Js.Exn.raiseError(Fetch.Response.statusText(res))
-       )
+    |> then_(res => res |> fetchJSONResponse)
     |> then_(response => callback(SuccessJSON(response)) |> resolve)
     |> catch(e => callback(Error([%bs.raw "e.message"])) |> resolve)
     |> ignore
@@ -152,13 +154,9 @@ let deleteTest = (id, callback) => {
   let path = p ++ "/tests/" ++ id;
   Js.Promise.(
     JsonTransport.delete(path)
-    |> then_(res =>
-         Fetch.Response.ok(res)
-           ? Fetch.Response.text(res)
-           : Js.Exn.raiseError(Fetch.Response.statusText(res))
-       )
+    |> then_(res => res |> fetchTextResponse)
     |> then_(response => callback(Success(response)) |> resolve)
-    |> catch(_ => callback(Error([%bs.raw "e.message"])) |> resolve)
+    |> catch(e => callback(Error([%bs.raw "e.message"])) |> resolve)
     |> ignore
   );
 };
@@ -167,13 +165,9 @@ let tryTest = (payload, callback) => {
   let path = p ++ "/tests/test";
   Js.Promise.(
     JsonTransport.post(path, payload)
-    |> then_(res =>
-         Fetch.Response.ok(res)
-           ? Fetch.Response.text(res)
-           : Js.Exn.raiseError(Fetch.Response.statusText(res))
-       )
+    |> then_(res => res |> fetchTextResponse)
     |> then_(response => callback(Success(response)) |> resolve)
-    |> catch(_ => callback(Error([%bs.raw "e.message"])) |> resolve)
+    |> catch(e => callback(Error([%bs.raw "e.message"])) |> resolve)
     |> ignore
   );
 };
@@ -182,11 +176,7 @@ let postContact = (payload, callback) => {
   let path = p ++ "/contacts";
   Js.Promise.(
     JsonTransport.post(path, payload)
-    |> then_(res =>
-         Fetch.Response.ok(res)
-           ? Fetch.Response.text(res)
-           : Js.Exn.raiseError(Fetch.Response.statusText(res))
-       )
+    |> then_(res => res |> fetchTextResponse)
     |> then_(response => callback(Success(response)) |> resolve)
     |> catch(e => callback(Error([%bs.raw "e.message"])) |> resolve)
     |> ignore
@@ -197,11 +187,7 @@ let putContact = (payload, callback) => {
   let path = p ++ "/contacts";
   Js.Promise.(
     JsonTransport.put(path, payload)
-    |> then_(res =>
-         Fetch.Response.ok(res)
-           ? Fetch.Response.text(res)
-           : Js.Exn.raiseError(Fetch.Response.statusText(res))
-       )
+    |> then_(res => res |> fetchTextResponse)
     |> then_(response => callback(Success(response)) |> resolve)
     |> catch(e => callback(Error([%bs.raw "e.message"])) |> resolve)
     |> ignore
@@ -212,11 +198,7 @@ let deleteContact = (id, callback) => {
   let path = p ++ "/contacts/" ++ id;
   Js.Promise.(
     JsonTransport.delete(path)
-    |> then_(res =>
-         Fetch.Response.ok(res)
-           ? Fetch.Response.text(res)
-           : Js.Exn.raiseError(Fetch.Response.statusText(res))
-       )
+    |> then_(res => res |> fetchTextResponse)
     |> then_(response => callback(Success(response)) |> resolve)
     |> catch(e => callback(Error([%bs.raw "e.message"])) |> resolve)
     |> ignore
@@ -227,11 +209,7 @@ let tryContact = (payload, callback) => {
   let path = p ++ "/contacts/test";
   Js.Promise.(
     JsonTransport.post(path, payload)
-    |> then_(res =>
-         Fetch.Response.ok(res)
-           ? Fetch.Response.text(res)
-           : Js.Exn.raiseError(Fetch.Response.statusText(res))
-       )
+    |> then_(res => res |> fetchTextResponse)
     |> then_(response => callback(Success(response)) |> resolve)
     |> catch(e => callback(Error([%bs.raw "e.message"])) |> resolve)
     |> ignore
@@ -242,11 +220,7 @@ let postTestContacts = (payload, callback) => {
   let path = p ++ "/testcontacts";
   Js.Promise.(
     JsonTransport.post(path, payload)
-    |> then_(res =>
-         Fetch.Response.ok(res)
-           ? Fetch.Response.text(res)
-           : Js.Exn.raiseError(Fetch.Response.statusText(res))
-       )
+    |> then_(res => res |> fetchTextResponse)
     |> then_(response => callback(Success(response)) |> resolve)
     |> catch(e => callback(Error([%bs.raw "e.message"])) |> resolve)
     |> ignore
@@ -257,13 +231,9 @@ let putTestContacts = (payload, callback) => {
   let path = p ++ "/testcontacts";
   Js.Promise.(
     JsonTransport.put(path, payload)
-    |> then_(res =>
-         Fetch.Response.ok(res)
-           ? Fetch.Response.text(res)
-           : Js.Exn.raiseError(Fetch.Response.statusText(res))
-       )
+    |> then_(res => res |> fetchTextResponse)
     |> then_(response => callback(Success(response)) |> resolve)
-    |> catch(_ => callback(Error([%bs.raw "e.message"])) |> resolve)
+    |> catch(e => callback(Error([%bs.raw "e.message"])) |> resolve)
     |> ignore
   );
 };

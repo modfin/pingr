@@ -55,7 +55,8 @@ let make = (~id) => {
   let deleteCallback = resp => {
     switch (resp) {
     | Api.Error(msg) => setErrorMsg(_ => msg)
-    | Api.Success(_) => Paths.goToTests()
+    | Api.Success(_)
+    | Api.SuccessJSON(_) => Paths.goToTests()
     };
   };
 
@@ -65,7 +66,7 @@ let make = (~id) => {
   | Success(test) =>
     <>
       <div className="relative bg-gray-400 my-4 p-1">
-        <p className="text-xl font-bold">
+        <p className="text-xl font-bold ml-1">
           {"Test status: " ++ test.testName |> React.string}
         </p>
         <button
@@ -84,7 +85,7 @@ let make = (~id) => {
              </p>
            : React.null}
       </div>
-      <div className="grid grid-rows-2 grid-cols-2  gap-4">
+      <div className="grid grid-rows-2 grid-cols-2  gap-4 p-2">
         <div className="col-span-2 row-span-1 md:col-span-1 md:row-span-2">
           <p className="text-lg font-bold"> {"Standard" |> React.string} </p>
           <DataField labelName="Type" value={test.testType} />
@@ -108,8 +109,7 @@ let make = (~id) => {
           <p className="text-lg font-bold"> {"Specific" |> React.string} </p>
           {switch (test.specific) {
            | TLS(port)
-           | TCP(port) =>
-             <DataField labelName="Port" value={string_of_int(port.port)} />
+           | TCP(port) => <DataField labelName="Port" value={port.port} />
            | HTTP(http) =>
              <>
                <DataField labelName="Method" value={http.method_} />
@@ -142,36 +142,38 @@ let make = (~id) => {
                           labelName={"Key " ++ string_of_int(i)}
                           value={pMetric.key}
                         />
-                        <DataField
-                          labelName="Lower bound"
-                          value={string_of_float(pMetric.lowerBound)}
-                        />
-                        <DataField
-                          labelName="Upper bound"
-                          value={string_of_float(pMetric.upperBound)}
-                        />
-                        <DataField
-                          labelName="Labels"
-                          value={
-                            switch (pMetric.labels) {
-                            | None => "-"
-                            | Some(labels) =>
-                              let keys = Js.Dict.keys(labels);
-                              let values = Js.Dict.values(labels);
-                              let dictString = ref("{ ");
-                              for (i in 0 to Array.length(keys) - 1) {
-                                dictString :=
-                                  dictString^
-                                  ++ keys[i]
-                                  ++ ": "
-                                  ++ values[i]
-                                  ++ ", ";
-                              };
-                              dictString := dictString^ ++ "}";
-                              dictString^;
+                        <div className="ml-10 md:mr-5">
+                          <DataField
+                            labelName="Lower bound"
+                            value={string_of_float(pMetric.lowerBound)}
+                          />
+                          <DataField
+                            labelName="Upper bound"
+                            value={string_of_float(pMetric.upperBound)}
+                          />
+                          <DataField
+                            labelName="Labels"
+                            value={
+                              switch (pMetric.labels) {
+                              | None => "-"
+                              | Some(labels) =>
+                                let keys = Js.Dict.keys(labels);
+                                let values = Js.Dict.values(labels);
+                                let dictString = ref("{ ");
+                                for (i in 0 to Array.length(keys) - 1) {
+                                  dictString :=
+                                    dictString^
+                                    ++ keys[i]
+                                    ++ ": "
+                                    ++ values[i]
+                                    ++ ", ";
+                                };
+                                dictString := dictString^ ++ "}";
+                                dictString^;
+                              }
                             }
-                          }
-                        />
+                          />
+                        </div>
                       </div>
                     })
                  |> React.array;

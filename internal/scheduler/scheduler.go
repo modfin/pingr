@@ -1,13 +1,16 @@
 package scheduler
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/jmoiron/sqlx"
 	log "github.com/sirupsen/logrus"
 	"math"
+	"math/rand"
 	"os"
 	"pingr"
+	"pingr/internal/bus"
 	"pingr/internal/config"
 	"pingr/internal/dao"
 	"pingr/internal/notifications"
@@ -22,110 +25,141 @@ const (
 	DataBaseListenerInterval = 10 * time.Minute
 
 	// Change in DB as well
-	Successful 	uint 	= 1
-	Error     	uint	= 2
-	TimedOut  	uint	= 3
-	Running		uint	= 4
-	Initialized	uint	= 5
-	Deleted 	uint    = 6
-)
-
-var (
-	muTests 			sync.RWMutex
-
-	tests 				= make(map[string] pingr.Test)
-	closeChans 			= make(map[string] chan int)
-
-	newTestChan         = make(chan pingr.Test, 10) // To be discussed
-	deletedTestChan     = make(chan string, 10)
-	statusChan          = make(chan testStatus, 10)
-	timeForTimeoutCheck = make(chan int)
+	Successful  uint = 1
+	Error       uint = 2
+	TimedOut    uint = 3
+	Running     uint = 4
+	Initialized uint = 5
+	Deleted     uint = 6
 )
 
 type testStatus struct {
-	TestId		string
-	Status 		uint
-	Error		error
+	TestId string
+	Status uint
+	Error  error
 }
 
-func Scheduler(db *sqlx.DB) {
-	go discSpaceMaintainer(db)
+type Scheduler struct {
+	buz     *bus.Bus
+	db      *sqlx.DB
+	muTests sync.RWMutex
 
-	go dataBaseListener(db) // Best way to handle DB error??
+	tests      map[string]pingr.GenericTest
+	closeChans map[string]chan struct{}
 
-	go testMaintainer(db)
+	statusChan          chan testStatus
+	timeForTimeoutCheck chan int
+}
 
-	initVars(db)
-
-	for {
-		select {
-			case newTest := <- newTestChan:
-				muTests.Lock()
-				testId := newTest.Get().TestId
-				tests[testId] = newTest
-				muTests.Unlock()
-
-				if _, ok := closeChans[testId]; ok {
-					close(closeChans[testId])
-					delete(closeChans, testId)
-				}
-
-				addTestLog(testId, Initialized, 0, nil, db)
-				statusChan <- testStatus{testId, Initialized, nil}
-
-				closeChans[testId] = make(chan int)
-				go worker(newTest, closeChans[testId], db)
-
-			case deletedTestId := <- deletedTestChan:
-				if c, ok := closeChans[deletedTestId]; ok {
-					close(c)
-					delete(closeChans, deletedTestId)
-				}
-				addTestLog(deletedTestId, Deleted, 0, nil, db)
-				statusChan <- testStatus{deletedTestId, Deleted, nil}
-
-				pingr.MuPush.Lock()
-				if c, ok := pingr.PushChans[deletedTestId]; ok {
-					close(c)
-					delete(pingr.PushChans, deletedTestId)
-				}
-				pingr.MuPush.Unlock()
-
-				muTests.Lock()
-				if _, ok := tests[deletedTestId]; ok {
-					delete(tests, deletedTestId)
-					log.Info(fmt.Sprintf("TestID: %s, Test deleted", deletedTestId))
-				}
-				muTests.Unlock()
-			case <-time.After(TestTimeoutCheckInterval):
-				timeForTimeoutCheck <- 1
-		}
+func New(db *sqlx.DB, buz *bus.Bus) *Scheduler {
+	s := &Scheduler{
+		db:                  db,
+		buz:                 buz,
+		tests:               make(map[string]pingr.GenericTest),
+		closeChans:          make(map[string]chan struct{}),
+		statusChan:          make(chan testStatus, 10),
+		timeForTimeoutCheck: make(chan int),
 	}
+
+	go s.discSpaceMaintainer(db)
+
+	go s.dataBaseListener(db) // Best way to handle DB error??
+
+	go s.testMaintainer(db)
+
+	s.initVars(db)
+
+	go s.commands()
+
+	return s
 }
 
-func worker(test pingr.Test, close chan int, db *sqlx.DB) {
+func (s *Scheduler) commands() {
+	go func (){
+		for {
+			data, err := s.buz.Next("delete", time.Minute)
+			if  err != nil{
+				// Probably a timeout
+				// could be channel closed, but it should be fixed next iteration
+				s.timeForTimeoutCheck <- 1
+				continue
+			}
+			testId := string(data)
+			if c, ok := s.closeChans[testId]; ok {
+				close(c)
+				delete(s.closeChans, testId)
+			}
+			addTestLog(testId, Deleted, 0, nil, s.db)
+			s.statusChan <- testStatus{testId, Deleted, nil}
+
+			err = s.buz.Close(fmt.Sprintf("push:%s", testId))
+			if err != nil{
+				log.Error("could not close bus channel: ", err.Error())
+			}
+
+			s.muTests.Lock()
+			if _, ok := s.tests[testId]; ok {
+				delete(s.tests, testId)
+				log.Info(fmt.Sprintf("TestID: %s, Test deleted", testId))
+			}
+			s.muTests.Unlock()
+		}
+
+	}()
+	go func (){
+		for {
+			data, err := s.buz.Next("new", time.Minute)
+			if  err != nil{
+				// Probably a timeout
+				// could be channel closed, but it should be fixed next iteration
+				continue
+			}
+			var test pingr.GenericTest
+			err = json.Unmarshal(data, &test)
+			if err != nil {
+				log.Error("could not unmarshal test: ", err)
+				continue
+			}
+
+			s.muTests.Lock()
+			testId := test.Get().TestId
+			s.tests[testId] = test
+			s.muTests.Unlock()
+
+			if _, ok := s.closeChans[testId]; ok {
+				close(s.closeChans[testId])
+				delete(s.closeChans, testId)
+			}
+
+			addTestLog(testId, Initialized, 0, nil, s.db)
+			s.statusChan <- testStatus{testId, Initialized, nil}
+
+			s.closeChans[testId] = make(chan struct{})
+			go s.worker(test, s.closeChans[testId])
+		}
+	}()
+
+}
+
+func (s *Scheduler) worker(test pingr.GenericTest, close chan struct{}) {
+	initSleep := rand.Int63n(300)
+	if config.Get().Dev {
+		initSleep = 0
+	}
+	time.Sleep(time.Duration(initSleep)*time.Second)
+
 	testId := test.Get().TestId
 	for {
-		select {
-		case <-close:
-			return
-		default:
-			statusChan <- testStatus{testId, Running,nil}
-		}
+		s.statusChan <- testStatus{testId, Running, nil}
 
-		rt, err := test.RunTest()
+		rt, err := test.RunTest(s.buz)
 
-		select {
-		case <-close:
-			return
-		default:
-			statusCode := Successful
-			if err != nil {
-				statusCode = Error
-			}
-			addTestLog(testId, statusCode, rt, err, db)
-			statusChan <- testStatus{testId, statusCode, err}
+		statusCode := Successful
+		if err != nil {
+			statusCode = Error
 		}
+		addTestLog(testId, statusCode, rt, err, s.db)
+		s.statusChan <- testStatus{testId, statusCode, err}
 
 		select {
 		case <-time.After(test.Get().Interval * time.Second):
@@ -135,14 +169,14 @@ func worker(test pingr.Test, close chan int, db *sqlx.DB) {
 	}
 }
 
-func testMaintainer(db *sqlx.DB) {
+func (s *Scheduler) testMaintainer(db *sqlx.DB) {
 	testStatusMap := make(map[string]uint)
 	lastUpdated := make(map[string]time.Time)
 	consecutiveErrors := make(map[string]uint)
 	testContactsNotified := make(map[string][]string)
 	for {
 		select {
-		case status := <-statusChan:
+		case status := <- s.statusChan:
 			id := status.TestId
 			switch status.Status {
 			case Successful:
@@ -150,10 +184,10 @@ func testMaintainer(db *sqlx.DB) {
 				consecutiveErrors[id] = 0
 				if _, ok := testContactsNotified[id]; ok {
 					// This is an active incident, notify that test is successful again
-					muTests.RLock()
+					s.muTests.RLock()
 					// Check that test still exists
-					if _, ok := tests[id]; !ok {
-						muTests.RUnlock()
+					if _, ok := s.tests[id]; !ok {
+						s.muTests.RUnlock()
 						break
 					}
 					var mailsToContact []string
@@ -173,16 +207,16 @@ func testMaintainer(db *sqlx.DB) {
 					}
 					var emailErr, postHookErr error
 					if len(mailsToContact) != 0 {
-						emailErr = notifications.SendEmail(mailsToContact, tests[id].Get(), status.Error, db)
+						emailErr = notifications.SendEmail(mailsToContact, s.tests[id].Get(), status.Error, db)
 					}
 					if len(postHooksToSend) != 0 {
-						postHookErr = notifications.PostHook(postHooksToSend, tests[id].Get(), status.Error, Successful)
+						postHookErr = notifications.PostHook(postHooksToSend, s.tests[id].Get(), status.Error, Successful)
 					}
 					if emailErr == nil && postHookErr == nil {
 						// Keep sending until no errors occur
 						delete(testContactsNotified, id)
 					}
-					muTests.RUnlock()
+					s.muTests.RUnlock()
 				}
 			case Error:
 				testStatusMap[id] = Error
@@ -191,16 +225,16 @@ func testMaintainer(db *sqlx.DB) {
 				if err != nil {
 					log.Error(err)
 				}
-				muTests.RLock()
+				s.muTests.RLock()
 				// Check that test still exists
-				if _, ok := tests[id]; !ok {
-					muTests.RUnlock()
+				if _, ok := s.tests[id]; !ok {
+					s.muTests.RUnlock()
 					break
 				}
-				testContactsNotified[id] = notifyContactsError(id, Error, status.Error,
-											consecutiveErrors[id], testContactTypes,
-											testContactsNotified[id], db)
-				muTests.RUnlock()
+				testContactsNotified[id] = s.notifyContactsError(id, Error, status.Error,
+					consecutiveErrors[id], testContactTypes,
+					testContactsNotified[id], db)
+				s.muTests.RUnlock()
 			case Running:
 				testStatusMap[id] = Running
 				lastUpdated[id] = time.Now()
@@ -214,13 +248,13 @@ func testMaintainer(db *sqlx.DB) {
 			default:
 				log.Error("invalid status code sent on statusChan")
 			}
-		case <-timeForTimeoutCheck:
+		case <-s.timeForTimeoutCheck:
 			log.Info("looking for timed out tests")
 			for id, statusCode := range testStatusMap {
 				if statusCode == Running {
-					muTests.RLock()
-					if runningTest, ok := tests[id]; ok {
-						testTimeout := runningTest.Get().Timeout*2*time.Second // TODO: *2
+					s.muTests.RLock()
+					if runningTest, ok := s.tests[id]; ok {
+						testTimeout := runningTest.Get().Timeout * 2 * time.Second // TODO: *2
 						if time.Now().After(lastUpdated[id].Add(testTimeout)) {
 							testStatusMap[id] = TimedOut
 							consecutiveErrors[id]++
@@ -231,33 +265,47 @@ func testMaintainer(db *sqlx.DB) {
 								log.Error(err)
 							}
 							// Check that test still exists
-							if _, ok := tests[id]; !ok {
-								muTests.RUnlock()
+							if _, ok := s.tests[id]; !ok {
+								s.muTests.RUnlock()
 								continue
 							}
-							testContactsNotified[id] = notifyContactsError(id, TimedOut, testError,
-														consecutiveErrors[id], testContactTypes,
-														testContactsNotified[id], db)
-							newTestChan <- tests[id] // Might not be the right way of doing it
-							// could cause an infinite amount of goroutines to get stuck
+							testContactsNotified[id] = s.notifyContactsError(id, TimedOut, testError,
+								consecutiveErrors[id], testContactTypes,
+								testContactsNotified[id], db)
+							t, err := dao.GetRawTest(id, s.db)
+							if err != nil {
+								log.Error(err)
+								continue
+							}
+							data, err := json.Marshal(t)
+							if err != nil {
+								log.Error(err)
+								continue
+							}
+							err = s.buz.Publish("new", data)
+							if err != nil {
+								log.Error(err)
+								continue
+							}
+
 						}
 					}
-					muTests.RUnlock()
+					s.muTests.RUnlock()
 				}
 			}
 		}
 	}
 }
 
-func notifyContactsError(
-		testId string,
-		statusCode uint,
-		testError error,
-		consecutiveErrors uint,
-		testContacts []dao.TestContactType,
-		testContactsNotified[]string,
-		db *sqlx.DB,
-	)[]string {
+func (s *Scheduler) notifyContactsError(
+	testId string,
+	statusCode uint,
+	testError error,
+	consecutiveErrors uint,
+	testContacts []dao.TestContactType,
+	testContactsNotified []string,
+	db *sqlx.DB,
+) []string {
 
 	var mailsToContact []string
 	var mailContactIds []string
@@ -289,7 +337,7 @@ func notifyContactsError(
 	}
 	// Notify contacts
 	if len(mailsToContact) != 0 {
-		err := notifications.SendEmail(mailsToContact, tests[testId].Get(), testError, db)
+		err := notifications.SendEmail(mailsToContact, s.tests[testId].Get(), testError, db)
 		if err != nil {
 			log.Error("unable to send email: ", err)
 		} else {
@@ -297,7 +345,7 @@ func notifyContactsError(
 		}
 	}
 	if len(postHooksToSend) != 0 {
-		err := notifications.PostHook(postHooksToSend, tests[testId].Get(), testError, statusCode)
+		err := notifications.PostHook(postHooksToSend, s.tests[testId].Get(), testError, statusCode)
 		if err != nil {
 			log.Error("unable to post hook")
 		} else {
@@ -307,66 +355,77 @@ func notifyContactsError(
 	return testContactsNotified
 }
 
-func dataBaseListener(db *sqlx.DB) {
+func (s *Scheduler) dataBaseListener(db *sqlx.DB) {
 	for {
 		select {
-			case <-time.After(DataBaseListenerInterval):
+		case <-time.After(DataBaseListenerInterval):
 		}
 		log.Info("Looking for new/updated tests in DB")
-		testsDB, err := dao.GetTests(db)
+		testsDB, err := dao.GetRawTests(db)
 		if err != nil {
 			continue // Bad
 		}
 
-		var newTests [] pingr.Test
+		var newTests []pingr.GenericTest
 		var deletedTests []string
 
 		// Look for new/updated test
-		muTests.RLock()
+		s.muTests.RLock()
 		for _, j := range testsDB {
-			if !reflect.DeepEqual(tests[j.Get().TestId], j) { // Found a new/updated test
+			if !reflect.DeepEqual(s.tests[j.Get().TestId], j) { // Found a new/updated test
 				newTests = append(newTests, j)
 			}
 		}
 
 		// Look for deleted tests
-		for testId := range tests {
+		for testId := range s.tests {
 			// slow but probably okay since user wont update/add that often
 			if !intInSlice(testId, testsDB) {
 				deletedTests = append(deletedTests, testId)
 			}
 		}
-		muTests.RUnlock()
+		s.muTests.RUnlock()
 
 		// Save result in array and send on channel after Unlock to avoid deadlock
 		for _, newTest := range newTests {
-			newTestChan <- newTest
+			data, err := json.Marshal(newTest)
+			if err != nil {
+				log.Error("could not marchal test: ", err.Error())
+				continue
+			}
+			err = s.buz.Publish("new", data)
+			if err != nil {
+				log.Error("could not add test: ", err.Error())
+			}
 		}
 		for _, testId := range deletedTests {
-			deletedTestChan <- testId
+			err = s.buz.Publish("delete", []byte(testId))
+			if err != nil {
+				log.Error("could not delete test: ", err.Error())
+			}
 		}
 
 	}
 }
 
-func initVars(db *sqlx.DB) {
-	testsDB, err := dao.GetTests(db)
+func (s *Scheduler) initVars(db *sqlx.DB) {
+	testsDB, err := dao.GetRawTests(db)
 	if err != nil {
 		log.Warn(err)
 	}
 
-	muTests.Lock()
-	defer muTests.Unlock()
+	s.muTests.Lock()
+	defer s.muTests.Unlock()
 
 	for _, test := range testsDB {
 		testId := test.Get().TestId
-		tests[testId] = test
+		s.tests[testId] = test
 
 		addTestLog(testId, Initialized, 0, nil, db)
-		statusChan <- testStatus{testId, Initialized, nil}
+		s.statusChan <- testStatus{testId, Initialized, nil}
 
-		closeChans[testId] = make(chan int)
-		go worker(test, closeChans[testId], db)
+		s.closeChans[testId] = make(chan struct{})
+		go s.worker(test, s.closeChans[testId])
 	}
 }
 
@@ -377,11 +436,11 @@ func addTestLog(testId string, statusCode uint, rt time.Duration, err error, db 
 	}
 	log.Info(fmt.Sprintf("TestID: %s, StatusCode: %d", testId, statusCode))
 	l := pingr.Log{
-		TestId:     		testId,
-		StatusId:  		statusCode,
-		Message:   		logMessage,
-		ResponseTime: 	rt,
-		CreatedAt: 		time.Now(),
+		TestId:       testId,
+		StatusId:     statusCode,
+		Message:      logMessage,
+		ResponseTime: rt,
+		CreatedAt:    time.Now(),
 	}
 	err = dao.PostLog(l, db)
 	if err != nil {
@@ -389,7 +448,7 @@ func addTestLog(testId string, statusCode uint, rt time.Duration, err error, db 
 	}
 }
 
-func discSpaceMaintainer(db *sqlx.DB) {
+func (s *Scheduler) discSpaceMaintainer(db *sqlx.DB) {
 	for {
 		log.Info("checking available disc space")
 		var stat syscall.Statfs_t
@@ -402,7 +461,7 @@ func discSpaceMaintainer(db *sqlx.DB) {
 		if err != nil {
 			log.Error(err)
 		}
-		availableGB := stat.Bavail*uint64(stat.Bsize)/uint64(math.Pow(1024,3))
+		availableGB := stat.Bavail * uint64(stat.Bsize) / uint64(math.Pow(1024, 3))
 		if availableGB < config.Get().MinDiscStorage {
 			err = dao.DeleteLastNLogs(100000, db)
 			if err != nil {
@@ -414,29 +473,7 @@ func discSpaceMaintainer(db *sqlx.DB) {
 
 }
 
-func NotifyNewTest(test pingr.Test) {
-	newTestChan <- test
-}
-
-func NotifyDeletedTest(testId string){
-	deletedTestChan <- testId
-}
-
-func NotifyPushTest(testId string, body []byte) error {
-	pingr.MuPush.RLock()
-	defer pingr.MuPush.RUnlock()
-	if _, ok := pingr.PushChans[testId]; ok {
-		select {
-		case pingr.PushChans[testId] <- body:
-			return nil
-		default:
-			return errors.New("test not responding")
-		}
-	}
-	return errors.New("test not initialized yet")
-}
-
-func intInSlice(a string, list []pingr.Test) bool {
+func intInSlice(a string, list []pingr.GenericTest) bool {
 	for _, b := range list {
 		if b.Get().TestId == a {
 			return true

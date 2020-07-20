@@ -19,10 +19,10 @@ type notificationInformation struct {
 	Interval 		time.Duration	`json:"interval"`
 }
 
-func PostHook(urls []string,  test pingr.BaseTest, testErr error, statusCode uint) error {
+func PostHook(urls []string, test pingr.BaseTest, testErr error, statusCode uint) error {
 	postMsg := notificationInformation{
-		TestId:      test.TestId,
-		TestName:    test.TestName,
+		TestId:     test.TestId,
+		TestName:   test.TestName,
 		Url:        test.Url,
 		TestType:   test.TestType,
 		StatusCode: statusCode,

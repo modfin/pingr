@@ -1,27 +1,31 @@
 package pingr
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
+	"github.com/jmoiron/sqlx/types"
+	log "github.com/sirupsen/logrus"
+	"pingr/internal/bus"
 	"pingr/internal/poll"
 	"pingr/internal/push"
-	"sync"
 	"time"
 )
 
 type Log struct {
-	LogId     		uint64			`json:"log_id" db:"log_id"`
-	TestId     		string			`json:"test_id" db:"test_id"`
-	StatusId  		uint			`json:"status_id" db:"status_id"`
-	Message   		string			`json:"message" db:"message"`
-	ResponseTime 	time.Duration	`json:"response_time" db:"response_time"`
-	CreatedAt 		time.Time		`json:"created_at" db:"created_at"`
+	LogId        uint64        `json:"log_id" db:"log_id"`
+	TestId       string        `json:"test_id" db:"test_id"`
+	StatusId     uint          `json:"status_id" db:"status_id"`
+	Message      string        `json:"message" db:"message"`
+	ResponseTime time.Duration `json:"response_time" db:"response_time"`
+	CreatedAt    time.Time     `json:"created_at" db:"created_at"`
 }
 
 type Contact struct {
-	ContactId 	string `json:"contact_id" db:"contact_id"`
+	ContactId   string `json:"contact_id" db:"contact_id"`
 	ContactName string `json:"contact_name" db:"contact_name"`
 	ContactType string `json:"contact_type" db:"contact_type"`
-	ContactUrl 	string `json:"contact_url" db:"contact_url"`
+	ContactUrl  string `json:"contact_url" db:"contact_url"`
 }
 
 func (c Contact) Validate() bool {
@@ -43,9 +47,9 @@ func (c Contact) Validate() bool {
 }
 
 type TestContact struct {
-	ContactId 	string 	`json:"contact_id" db:"contact_id"`
-	TestId 		string 	`json:"test_id" db:"test_id"`
-	Threshold	uint 	`json:"threshold" db:"threshold"`
+	ContactId string `json:"contact_id" db:"contact_id"`
+	TestId    string `json:"test_id" db:"test_id"`
+	Threshold uint   `json:"threshold" db:"threshold"`
 }
 
 func (c TestContact) Validate() bool {
@@ -62,23 +66,129 @@ func (c TestContact) Validate() bool {
 }
 
 type Test interface {
-	RunTest() 	(time.Duration, error)
-	Validate()	bool
-	Get()		BaseTest
+	RunTest(buz *bus.Bus) (time.Duration, error)
+	Validate() bool
 }
 
 type BaseTest struct {
-	TestId		string			`json:"test_id" db:"test_id"`
-	TestName	string 			`json:"test_name" db:"test_name"`
-	TestType 	string			`json:"test_type" db:"test_type"`
-	Timeout 	time.Duration 	`json:"timeout"`
-	Url 		string 			`json:"url"`
-	Interval 	time.Duration 	`json:"interval"`
-	CreatedAt	time.Time		`json:"created_at" db:"created_at"`
+	TestId    string        `json:"test_id" db:"test_id"`
+	TestName  string        `json:"test_name" db:"test_name"`
+	TestType  string        `json:"test_type" db:"test_type"`
+	Timeout   time.Duration `json:"timeout"`
+	Url       string        `json:"url"`
+	Interval  time.Duration `json:"interval"`
+	CreatedAt time.Time     `json:"created_at" db:"created_at"`
+}
+
+func (j BaseTest) Get() BaseTest {
+	return j
+}
+
+type GenericTest struct {
+	BaseTest
+	Blob types.JSONText `json:"blob" db:"blob"`
+
+	memoize Test
+}
+
+func (j GenericTest) RunTest(buz *bus.Bus) (time.Duration, error) {
+	var err error
+	if j.memoize == nil {
+		j.memoize, err = j.Impl()
+		if err != nil {
+			return 0, err
+		}
+	}
+	return j.memoize.RunTest(buz)
+}
+
+func (j GenericTest) Validate() bool {
+	var err error
+	if j.memoize == nil {
+		j.memoize, err = j.Impl()
+		if err != nil {
+			return false
+		}
+	}
+	return j.memoize.Validate()
+}
+
+func (j GenericTest) Impl() (parsedTest Test, err error) {
+	switch j.TestType {
+	case "SSH":
+		var t SSHTest
+		t.BaseTest = j.BaseTest
+		err = json.Unmarshal(j.Blob, &t.Blob)
+		if err != nil {
+			return
+		}
+		parsedTest = t
+	case "TCP":
+		var t TCPTest
+		t.BaseTest = j.BaseTest
+		err = json.Unmarshal(j.Blob, &t.Blob)
+		if err != nil {
+			return
+		}
+		parsedTest = t
+	case "TLS":
+		var t TLSTest
+		t.BaseTest = j.BaseTest
+		err = json.Unmarshal(j.Blob, &t.Blob)
+		if err != nil {
+			return
+		}
+		parsedTest = t
+	case "Ping":
+		var t PingTest
+		t.BaseTest = j.BaseTest
+		parsedTest = t
+	case "HTTP":
+		var t HTTPTest
+		t.BaseTest = j.BaseTest
+		err = json.Unmarshal(j.Blob, &t.Blob)
+		if err != nil {
+			return
+		}
+		parsedTest = t
+	case "DNS":
+		var t DNSTest
+		t.BaseTest = j.BaseTest
+		err = json.Unmarshal(j.Blob, &t.Blob)
+		if err != nil {
+			return
+		}
+		parsedTest = t
+	case "Prometheus":
+		var t PrometheusTest
+		t.BaseTest = j.BaseTest
+		err = json.Unmarshal(j.Blob, &t.Blob)
+		if err != nil {
+			return
+		}
+		parsedTest = t
+	case "PrometheusPush":
+		var t PrometheusPushTest
+		t.BaseTest = j.BaseTest
+		err = json.Unmarshal(j.Blob, &t.Blob)
+		if err != nil {
+			return
+		}
+		parsedTest = t
+	case "HTTPPush":
+		var t HTTPPushTest
+		t.BaseTest = j.BaseTest
+		parsedTest = t
+	default:
+		err = errors.New(j.TestType + " is not a valid test type")
+	}
+	return
 }
 
 func (j BaseTest) Validate() bool {
-	if j.TestId == "" {return false}
+	if j.TestId == "" {
+		return false
+	}
 	if j.TestName == "" {
 		return false
 	}
@@ -87,11 +197,14 @@ func (j BaseTest) Validate() bool {
 		if j.Url == "" {
 			return false
 		}
+		if j.Interval < 0 {
+			return false
+		}
 	case "HTTPPush", "PrometheusPush":
+		if j.Interval != 0 {
+			return false
+		}
 	default:
-		return false
-	}
-	if j.Interval < 0 {
 		return false
 	}
 	if j.Timeout == 0 {
@@ -101,88 +214,84 @@ func (j BaseTest) Validate() bool {
 }
 
 type SSHTest struct {
-	Username 	string 	`json:"username"`
-	Password	string 	`json:"password"`
-	Port		string 	`json:"port"`
-	UseKeyPair	bool 	`json:"use_key_pair"`
+	Blob struct {
+		Username   string `json:"username"`
+		Password   string `json:"password"`
+		Port       string `json:"port"`
+		UseKeyPair bool   `json:"use_key_pair"`
+	} `json:"blob"`
 	BaseTest
 }
 
-func (t SSHTest) RunTest() (time.Duration, error) {
-	return poll.SSH(t.Url, t.Port, t.Timeout, t.Username, t.Password, t.UseKeyPair)
+func (t SSHTest) RunTest(*bus.Bus) (time.Duration, error) {
+	return poll.SSH(t.Url, t.Blob.Port, t.Timeout, t.Blob.Username, t.Blob.Password, t.Blob.UseKeyPair)
 }
 
 func (t SSHTest) Validate() bool {
 	if !t.BaseTest.Validate() {
 		return false
 	}
-	if t.Username == "" {
+	if t.Blob.Username == "" {
 		return false
 	}
-	if t.Port == "" {
+	if t.Blob.Port == "" {
 		return false
 	}
-	if !t.UseKeyPair && t.Password == "" {
-		return false//Maybe some ssh servers won't require password but I guess most do
+	if !t.Blob.UseKeyPair && t.Blob.Password == "" {
+		return false //Maybe some ssh servers won't require password but I guess most do
 	}
 	return true
 }
 
-func (t SSHTest) Get() BaseTest {
-	return t.BaseTest
-}
-
 type TCPTest struct {
-	Port	string `json:"port"`
+	Blob struct {
+		Port string `json:"port"`
+	} `json:"blob"`
 	BaseTest
 }
 
-func (t TCPTest) RunTest() (time.Duration, error) {
-	return poll.TCP(t.Url, t.Port, t.Timeout)
+func (t TCPTest) RunTest(*bus.Bus) (time.Duration, error) {
+	log.Info(t)
+	return poll.TCP(t.Url, t.Blob.Port, t.Timeout)
 }
 
 func (t TCPTest) Validate() bool {
 	if !t.BaseTest.Validate() {
 		return false
 	}
-	if t.Port == "" {
+	if t.Blob.Port == "" {
 		return false
 	}
 	return true
 }
 
-func (t TCPTest) Get() BaseTest {
-	return t.BaseTest
-}
-
 type TLSTest struct {
-	Port 	string `json:"port"`
+	Blob struct {
+		Port string `json:"port"`
+	} `json:"blob"`
 	BaseTest
 }
 
-func (t TLSTest) RunTest() (time.Duration, error) {
-	return poll.TLS(t.Url, t.Port, t.Timeout)
+func (t TLSTest) RunTest(*bus.Bus) (time.Duration, error) {
+	return poll.TLS(t.Url, t.Blob.Port, t.Timeout)
 }
 
 func (t TLSTest) Validate() bool {
 	if !t.BaseTest.Validate() {
 		return false
 	}
-	if t.Port == "" {
+	if t.Blob.Port == "" {
 		return false
 	}
 	return true
 }
 
-func (t TLSTest) Get() BaseTest {
-	return t.BaseTest
-}
-
 type PingTest struct {
+	Blob struct{} `json:"blob"`
 	BaseTest
 }
 
-func (t PingTest) RunTest() (time.Duration, error) {
+func (t PingTest) RunTest(*bus.Bus) (time.Duration, error) {
 	return poll.Ping(t.Url, t.Timeout)
 }
 
@@ -193,26 +302,28 @@ func (t PingTest) Validate() bool {
 	return true
 }
 
-func (t PingTest) Get() BaseTest {
-	return t.BaseTest
-}
-
 type HTTPTest struct {
-	Method 		string `json:"method"`
-	Payload		[]byte `json:"payload"`
-	ExpResult	[]byte `json:"exp_result"`
+	Blob struct {
+		ReqMethod  string            `json:"req_method""`
+		ReqHeaders map[string]string `json:"req_headers"`
+		ReqBody    string            `json:"req_body"`
+
+		ResStatus  int               `json:"res_status"`
+		ResHeaders map[string]string `json:"res_headers"`
+		ResBody    string            `json:"res_body"`
+	} `json:"blob"`
 	BaseTest
 }
 
-func (t HTTPTest) RunTest() (time.Duration, error) {
-	return poll.HTTP(t.Url, t.Method, t.Timeout*time.Second, t.Payload, t.ExpResult)
+func (t HTTPTest) RunTest(*bus.Bus) (time.Duration, error) {
+	return poll.HTTP(t.Url, t.Blob.ReqMethod, t.Timeout*time.Second, []byte(t.Blob.ReqBody), []byte(t.Blob.ResBody))
 }
 
 func (t HTTPTest) Validate() bool {
 	if !t.BaseTest.Validate() {
 		return false
 	}
-	switch t.Method {
+	switch t.Blob.ReqMethod {
 	case "GET", "POST", "PUT", "HEAD", "DELETE":
 	default:
 		return false
@@ -220,57 +331,49 @@ func (t HTTPTest) Validate() bool {
 	return true
 }
 
-func (t HTTPTest) Get() BaseTest {
-	return t.BaseTest
-}
-
 type DNSTest struct {
-	 IpAddr string 		`json:"ip_addr"`
-	 CNAME	string 		`json:"cname"`
-	 TXT	[]string 	`json:"txt"`
-	 BaseTest
+	Blob struct {
+		IpAddr string   `json:"ip_addr"`
+		CNAME  string   `json:"cname"`
+		TXT    []string `json:"txt"`
+	} `json:"blob"`
+
+	BaseTest
 }
 
-func (t DNSTest) RunTest() (time.Duration, error) {
-	return poll.DNS(t.Url, t.Timeout*time.Second, t.IpAddr, t.CNAME, t.TXT)
+func (t DNSTest) RunTest(*bus.Bus) (time.Duration, error) {
+	return 0, nil //TODO fix poll.DNS(t.Url, t.Timeout*time.Second, t.Blob.IpAddr, t.Blob.CNAME, t.Blob.TXT)
 }
 
 func (t DNSTest) Validate() bool {
 	if !t.BaseTest.Validate() {
 		return false
 	}
-	if len(t.TXT) == 0 && t.CNAME == "" && t.IpAddr == "" { // Has to test something
+	if len(t.Blob.TXT) == 0 && t.Blob.CNAME == "" && t.Blob.IpAddr == "" { // Has to test something
 		return false
 	}
 	return true
 }
 
-func (t DNSTest) Get() BaseTest {
-	return t.BaseTest
-}
-
-var (
-	MuPush				sync.RWMutex
-	PushChans 			= make(map[string] chan []byte)
-)
-
 type PrometheusTest struct {
-	MetricTests []push.MetricTest `json:"metric_tests"`
+	Blob struct {
+		MetricTests []push.MetricTest `json:"metric_tests"`
+	} `json:"blob"`
 	BaseTest
 }
 
-func (t PrometheusTest) RunTest() (time.Duration, error) {
-	return poll.Prometheus(t.TestId, t.Url, t.Timeout * time.Second, t.MetricTests)
+func (t PrometheusTest) RunTest(*bus.Bus) (time.Duration, error) {
+	return poll.Prometheus(t.TestId, t.Url, t.Timeout*time.Second, t.Blob.MetricTests)
 }
 
 func (t PrometheusTest) Validate() bool {
 	if !t.BaseTest.Validate() {
 		return false
 	}
-	if len(t.MetricTests) == 0 {
+	if len(t.Blob.MetricTests) == 0 {
 		return false
 	}
-	for _, metricTest := range t.MetricTests {
+	for _, metricTest := range t.Blob.MetricTests {
 		if !metricTest.Validate() {
 			return false
 		}
@@ -278,34 +381,16 @@ func (t PrometheusTest) Validate() bool {
 	return true
 }
 
-func (t PrometheusTest) Get() BaseTest {
-	return t.BaseTest
-}
-
-
 type HTTPPushTest struct {
+	Blob struct{} `json:"blob"`
 	BaseTest
 }
 
-func (t HTTPPushTest) RunTest() (time.Duration, error) {
-	MuPush.RLock()
-	pushChannel, ok := PushChans[t.TestId]
-	MuPush.RUnlock()
-
-	if !ok {
-		MuPush.Lock()
-		PushChans[t.TestId] = make(chan []byte)
-		MuPush.Unlock()
-		pushChannel = PushChans[t.TestId]
-	}
-
+func (t HTTPPushTest) RunTest(buz *bus.Bus) (time.Duration, error) {
 	start := time.Now()
-	select {
-	case <-pushChannel:
-		return time.Since(start), nil
-	case <-time.After(t.Timeout*time.Second):
-		return time.Since(start), errors.New("timeout reached on push test")
-	}
+	_, err := buz.Next(fmt.Sprintf("push:%s", t.TestId), t.Timeout*time.Second)
+
+	return time.Since(start), err
 }
 
 func (t HTTPPushTest) Validate() bool {
@@ -315,55 +400,35 @@ func (t HTTPPushTest) Validate() bool {
 	return true
 }
 
-func (t HTTPPushTest) Get() BaseTest {
-	return t.BaseTest
-}
-
 type PrometheusPushTest struct {
-	MetricTests []push.MetricTest 	`json:"metric_tests"`
+	Blob struct {
+		MetricTests []push.MetricTest `json:"metric_tests"`
+	} `json:"blob"`
 	BaseTest
 }
 
-func (t PrometheusPushTest) RunTest() (time.Duration, error) {
-	MuPush.RLock()
-	pushChannel, ok := PushChans[t.TestId]
-	MuPush.RUnlock()
-
-	if !ok {
-		MuPush.Lock()
-		PushChans[t.TestId] = make(chan []byte)
-		MuPush.Unlock()
-		pushChannel = PushChans[t.TestId]
-	}
-
+func (t PrometheusPushTest) RunTest(buz *bus.Bus) (time.Duration, error) {
 	start := time.Now()
-	select {
-	case reqBody, ok := <-pushChannel:
-		if ok {
-			err := push.Prometheus(t.TestId, reqBody, t.MetricTests)
-			return time.Since(start), err
-		}
-		return 0, nil
-	case <-time.After(t.Timeout*time.Second):
-		return time.Since(start), errors.New("timeout reached on push test")
+	reqBody, err := buz.Next(fmt.Sprintf("push:%s", t.TestId), t.Timeout*time.Second)
+	if err != nil {
+		return time.Since(start), err
 	}
+	err = push.Prometheus(t.TestId, reqBody, t.Blob.MetricTests)
+
+	return time.Since(start), err
 }
 
 func (t PrometheusPushTest) Validate() bool {
 	if !t.BaseTest.Validate() {
 		return false
 	}
-	if len(t.MetricTests) == 0 {
+	if len(t.Blob.MetricTests) == 0 {
 		return false
 	}
-	for _, metricTest := range t.MetricTests {
+	for _, metricTest := range t.Blob.MetricTests {
 		if !metricTest.Validate() {
 			return false
 		}
 	}
 	return true
-}
-
-func (t PrometheusPushTest) Get() BaseTest {
-	return t.BaseTest
 }

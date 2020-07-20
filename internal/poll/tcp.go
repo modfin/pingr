@@ -14,7 +14,7 @@ func TCP(hostname string, port string, timeOut time.Duration) (time.Duration, er
 		return time.Since(start), err
 	}
 
-	dialer := net.Dialer{Timeout: timeOut}
+	dialer := net.Dialer{Timeout: timeOut*time.Second}
 	conn, err := dialer.Dial("tcp", tcpAddr.String())
 	if err != nil {
 		return time.Since(start), err

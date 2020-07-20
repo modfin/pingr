@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"pingr/internal/platform/dns"
-	"strings"
 	"time"
 )
 
@@ -28,68 +26,160 @@ const (
 	_port = "53"
 )
 
-func DNS(domain string, timeout time.Duration, ipAddrCheck string, cnameCheck string, txtCheck []string) (time.Duration, error) {
+type Record string
+
+const (
+	A     Record = "A"
+	CNAME Record = "CNAME"
+	TXT   Record = "TXT"
+	MX    Record = "MX"
+	NS    Record = "NS"
+)
+
+type Strategy string
+
+const (
+
+	// check = a, b, c
+	// res = a,b,c,d
+	// -> true
+	// check = a, b, c, e
+	// res = a, b, c, d
+	// -> false
+	CheckIsSubset Strategy = "check_is_subset"
+
+	// check = a,b,c,d
+	// res = a, b, c
+	// -> true
+	// check = a, b, c, d
+	// res = a, b, c, e
+	// -> false
+	DNSIsSubset Strategy = "dns_is_subset"
+
+	// check = a, b, c
+	// res = a,d,e,f
+	// -> true
+	// check = a, b, c
+	// res = d,e,f
+	// -> false
+	Intersects Strategy = "intersects"
+
+	// check = a, b, c
+	// res = a, b, c
+	// -> true
+	// check = a, b, c
+	// res = a, b, c, d
+	// -> false
+	// check = a, b, c. d
+	// res = a, b, c
+	// -> false
+	Exact Strategy = "exact"
+)
+
+// mfn.se
+//
+func DNS(resolvers []string, domain string, timeout time.Duration, record Record, strategy Strategy, check []string) (time.Duration, error) {
 	start := time.Now()
 
-	DNSServers := dns.Get()
-
-	for _, DNSAddr := range DNSServers {
+	Loop:
+	for _, addr := range resolvers {
 		r := &net.Resolver{
 			PreferGo: true,
 			Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
 				d := net.Dialer{
 					Timeout: timeout,
 				}
-				return d.DialContext(ctx, "udp", fmt.Sprintf("%s:%s", DNSAddr, _port))
+				return d.DialContext(ctx, "udp", fmt.Sprintf("%s:%s", addr, _port))
 			},
 		}
 
-		// Check that ips match
-		if ipAddrCheck != "" {
-			ips, err := r.LookupHost(context.Background(), domain)
+		var res []string
+		var err error
+		switch record {
+		case A:
+			res, err = r.LookupHost(context.Background(), domain)
 			if err != nil {
 				return time.Since(start), err
 			}
-			ipMatch := false
-			for _, ip := range ips {
-				if ipAddrCheck == ip {
-					ipMatch = true
-				}
+		case CNAME:
+			name, err := r.LookupCNAME(context.Background(), domain)
+			if err != nil {
+				return time.Since(start), err
 			}
-			if !ipMatch {
-				return time.Since(start), errors.New(fmt.Sprintf("Expected: %s but got: %s", ipAddrCheck, ips))
+			res = []string{name}
+		case TXT:
+			res, err = r.LookupTXT(context.Background(), domain)
+			if err != nil {
+				return time.Since(start), err
 			}
+		case MX:
+			mx, err := r.LookupMX(context.Background(), domain)
+			if err != nil {
+				return time.Since(start), err
+			}
+			for _, x := range mx {
+				res = append(res, x.Host)
+			}
+		case NS:
+			ns, err := r.LookupNS(context.Background(), domain)
+			if err != nil {
+				return time.Since(start), err
+			}
+			for _, n := range ns {
+				res = append(res, n.Host)
+			}
+		default:
+			return 0, fmt.Errorf("selected records, %v, is not implmented", record)
 		}
 
-		// Check that CNAME match
-		if cnameCheck != "" {
-			cname, err := r.LookupCNAME(context.Background(), domain)
-			if err != nil {
-				return time.Since(start), err
-			}
-			if cname != cnameCheck {
-				return time.Since(start), errors.New(fmt.Sprintf("Expected: %s but got: %s", cnameCheck, cname))
-			}
+		var dnsSet = map[string]struct{}{}
+		for _, r := range res{
+			dnsSet[r] = struct{}{}
+		}
+		var checkSet = map[string]struct{}{}
+		for _, r := range check{
+			checkSet[r] = struct{}{}
 		}
 
-		// Check that the TXT contains values
-		if txtCheck != nil {
-			txts, err := r.LookupTXT(context.Background(), domain)
-			if err != nil {
-				return time.Since(start), err
+
+		switch strategy {
+		case Exact:
+			if len(dnsSet) != len(checkSet) {
+				return time.Since(start), errors.New("dns result size does not match expected number of records")
 			}
-			for _, txtReqValue := range txtCheck {
-				check := false
-				for _, txt := range txts {
-					if strings.Contains(txt, txtReqValue) {
-						check = true
-					}
-				}
-				if !check {
-					return time.Since(start), errors.New(fmt.Sprintf("Expected TXT to contain: %s got: %s", txtReqValue, txts))
+			fallthrough
+		case CheckIsSubset:
+			for c := range checkSet {
+				_, ok := dnsSet[c]
+				if !ok {
+					return time.Since(start), errors.New("all checks were not contained in dns result")
 				}
 			}
+			continue Loop
+
+		case DNSIsSubset:
+			for c := range dnsSet {
+				_, ok := checkSet[c]
+				if !ok {
+					return time.Since(start), errors.New("all dns results where not contained in checks")
+				}
+			}
+			continue Loop
+
+		case Intersects:
+			for c := range checkSet {
+				_, ok := dnsSet[c]
+				if ok {
+					continue Loop
+				}
+			}
+			return time.Since(start), errors.New("dns result did not intersect with check")
+
+		default:
+			return 0, fmt.Errorf("selected strategy, %v, is not implmented", strategy)
 		}
+
+
 	}
 
 	return time.Since(start), nil

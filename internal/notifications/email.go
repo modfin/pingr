@@ -55,15 +55,15 @@ func SendEmail(receivers []string, test pingr.BaseTest, testErr error, db *sqlx.
 
 	e := &email.Email {
 		To:      receivers,
-		From:    fmt.Sprintf("Pingr Lad <%s>", config.Get().SMTPUsername),
+		From:    fmt.Sprintf("Pingr <%s>", config.Get().SMTPUsername),
 		Headers: textproto.MIMEHeader{},
 	}
 
 	if testErr != nil {
-		e.Subject = fmt.Sprintf("Pingr - Error: %s", test.TestName)
+		e.Subject = fmt.Sprintf("Error: %s", test.TestName)
 		e.HTML = []byte(fmt.Sprintf(htmlError, test.TestName, testErr, logsHTML(logs)))
 	} else {
-		e.Subject = fmt.Sprintf("Pingr - Test Succesful: %s", test.TestName)
+		e.Subject = fmt.Sprintf("Succesful: %s", test.TestName)
 		e.HTML = []byte(fmt.Sprintf(htmlSuccess, test.TestName, logsHTML(logs)))
 	}
 
@@ -87,7 +87,7 @@ func logsHTML(logs []dao.FullLog) string {
 	for _, log := range logs {
 		html += fmt.Sprintf(
 			"<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>",
-			log.CreatedAt.Format("2006-01-02T15:04:05"), log.StatusName,
+			log.CreatedAt.Local().Format("2006-01-02T15:04:05"), log.StatusName,
 			log.Message, log.ResponseTime.Round(time.Millisecond).String())
 	}
 	html += "</tbody></table>"

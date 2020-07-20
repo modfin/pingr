@@ -18,6 +18,10 @@ type testState =
 
 type state = Loadable.t(list(Models.Log.t));
 
+let toMicroSeconds = (duration): float => {
+  duration /. 100000.;
+};
+
 [@react.component]
 let make = (~testId) => {
   let (state, dispatch) =
@@ -61,12 +65,12 @@ let make = (~testId) => {
                      ~data=
                        logs
                        |> List.filter(log => log.statusId != 5)
-                       |> List.map(log =>
+                       |> List.rev_map(log =>
                             log.responseTime
                             |> float_of_int
-                            |> Js.Date.fromFloat
-                            |> Js.Date.getMilliseconds
-                            |> int_of_float
+                            |> toMicroSeconds
+                            |> Js.Float.toFixedWithPrecision(~digits=1)
+                            |> float_of_string
                           )
                        |> Array.of_list,
                      ~name="Response time",
@@ -75,7 +79,7 @@ let make = (~testId) => {
                        logs
                        |> List.filter(log => log.statusId != 5)
                        /* red:f45b5b  gr:90ed7d */
-                       |> List.map(log =>
+                       |> List.rev_map(log =>
                             switch (log.statusId) {
                             | 1 => "#90ed7d" /* green */
                             | 2
@@ -96,7 +100,7 @@ let make = (~testId) => {
                    ~categories=
                      logs
                      |> List.filter(log => log.statusId != 5)
-                     |> List.map(log => log.createdAt)
+                     |> List.rev_map(log => log.createdAt)
                      |> Array.of_list,
                    (),
                  )

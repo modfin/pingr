@@ -12,7 +12,7 @@ module Test = {
     labels: option(Js.Dict.t(string)),
   };
 
-  type portTest = {port: int};
+  type portTest = {port: string};
 
   type promMetrics = {metrics: array(promMetric)};
 
@@ -70,14 +70,14 @@ module Decode = {
       (testType: string, json: Js.Json.t): Test.specificTestInfo => {
     Json.(
       switch (testType) {
-      | "TLS" => Decode.(Test.TLS({port: json |> field("port", int)}))
-      | "TCP" => Decode.(Test.TCP({port: json |> field("port", int)}))
+      | "TLS" => Decode.(Test.TLS({port: json |> field("port", string)}))
+      | "TCP" => Decode.(Test.TCP({port: json |> field("port", string)}))
       | "HTTP" =>
         Decode.(
           Test.HTTP({
-            method_: json |> field("method", string),
-            expResult: json |> field("exp_result", optional(string)),
-            payload: json |> field("payload", optional(string)),
+            method_: json |> field("req_method", string),
+            expResult: json |> field("res_body", optional(string)),
+            payload: json |> field("req_body", optional(string)),
           })
         )
       | "Prometheus" =>
@@ -114,7 +114,7 @@ module Decode = {
         url: json |> field("url", string),
         interval: json |> field("interval", int),
         createdAt: json |> field("created_at", string),
-        specific: json |> testSpecificInfo(testType),
+        specific: json |> field("blob", testSpecificInfo(testType)),
       }
     );
   };

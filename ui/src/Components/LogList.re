@@ -18,10 +18,12 @@ type testState =
 
 type state = Loadable.t(list(Models.Log.t));
 
+let toMicroSeconds = (duration): float => {
+  duration /. 100000.;
+};
+
 [@react.component]
 let make = (~testId=?, ()) => {
-  let (loadLog, setLoadLog) = React.useState(_ => true);
-
   let (viewSuccess, setViewSuccess) = React.useState(() => true);
   let (viewError, setViewError) = React.useState(() => true);
   let (viewTimedOut, setViewTimedOut) = React.useState(() => true);
@@ -53,7 +55,6 @@ let make = (~testId=?, ()) => {
         | None => Api.fetchLogsWithCallback(~numDays, cb, ())
         | Some(id) => Api.fetchLogsWithCallback(~id, ~numDays, cb, ())
         };
-        setLoadLog(_ => false);
       | _ => ()
       };
       None;
@@ -61,14 +62,11 @@ let make = (~testId=?, ()) => {
     [|state|],
   );
   <>
-    <div className="relative bg-gray-200 my-1 p-3">
+    <div className="relative bg-gray-200 my-1 p-2">
       <p className="text-xl font-bold"> {ReasonReact.string("Logs")} </p>
       <button
         type_="button"
-        onClick={_e => {
-          dispatch(LoadData);
-          setLoadLog(_ => true);
-        }}
+        onClick={_e => {dispatch(LoadData)}}
         className="bg-blue-500 hover:bg-blue-700 text-white py-1 px-2 rounded">
         <p className="text-sm"> {ReasonReact.string("Refresh")} </p>
       </button>
@@ -177,21 +175,21 @@ let make = (~testId=?, ()) => {
                      <td className="border px-4 py-2 w-1/6">
                        {switch (log.statusId) {
                         | 1 =>
-                          <div className="text-green-600">
+                          <p className="text-green-600">
                             {"Success" |> React.string}
-                          </div>
+                          </p>
                         | 2 =>
-                          <div className="text-red-600">
+                          <p className="text-red-600">
                             {"Error" |> React.string}
-                          </div>
+                          </p>
                         | 3 =>
-                          <div className="text-red-600">
+                          <p className="text-red-600">
                             {"Timed out" |> React.string}
-                          </div>
+                          </p>
                         | 5 =>
-                          <div className="text-gray-600">
+                          <p className="text-gray-600">
                             {"Initialized" |> React.string}
-                          </div>
+                          </p>
                         | _ => "Unknown status id" |> React.string
                         }}
                      </td>
@@ -199,9 +197,8 @@ let make = (~testId=?, ()) => {
                        {React.string(
                           log.responseTime
                           |> float_of_int
-                          |> Js.Date.fromFloat
-                          |> Js.Date.getMilliseconds
-                          |> string_of_float,
+                          |> toMicroSeconds
+                          |> Js.Float.toFixedWithPrecision(~digits=1),
                         )}
                      </td>
                      <td className="border px-4 py-2 w-1/4">

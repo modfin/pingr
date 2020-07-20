@@ -1,14 +1,15 @@
 package push
 
 import (
+	"fmt"
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo/v4"
 	"io/ioutil"
+	"pingr/internal/bus"
 	"pingr/internal/dao"
-	"pingr/internal/scheduler"
 )
 
-func Init(g *echo.Group) {
+func Init(g *echo.Group, buz *bus.Bus) {
 	// Listen to push requests
 	g.GET("/:test-id/:vanity-name", func(context echo.Context) error {
 		testId:= context.Param("test-id")
@@ -19,7 +20,7 @@ func Init(g *echo.Group) {
 			return context.String(400, "invalid testId")
 		}
 
-		err = scheduler.NotifyPushTest(testId, nil)
+		err = buz.Publish(fmt.Sprintf("push:%s", testId), nil)
 		if err != nil {
 			return context.String(500, err.Error())
 		}
@@ -42,7 +43,7 @@ func Init(g *echo.Group) {
 		}
 
 		// Notify worker of push retrieval
-		err = scheduler.NotifyPushTest(testId, reqBody)
+		err = buz.Publish(fmt.Sprintf("push:%s", testId), reqBody)
 		if err != nil {
 			return context.String(500, err.Error())
 		}

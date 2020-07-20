@@ -226,7 +226,7 @@ let make = (~submitContact, ~inputContact: option(Models.Contact.t)=?) => {
           <button
             type_="button"
             onClick={_ => handleTryContact(f.form.values, f.form.errors)}
-            className="m-1 bg-blue-500 hover:bg-blue-700 text-white py-1 px-2 rounded">
+            className="mr-1 bg-blue-500 hover:bg-blue-700 text-white py-1 px-2 rounded">
             {"Test contact" |> React.string}
           </button>
           <button

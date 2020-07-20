@@ -1,15 +1,18 @@
 package tests
 
 import (
+	"encoding/json"
+	"fmt"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo/v4"
+	"pingr"
+	"pingr/internal/bus"
 	"pingr/internal/dao"
-	"pingr/internal/scheduler"
 	"time"
 )
 
-func Init(g *echo.Group) {
+func Init(g *echo.Group, buz *bus.Bus) {
 	// Get all Tests
 	g.GET("", func(context echo.Context) error {
 		db := context.Get("DB").(*sqlx.DB)
@@ -62,7 +65,7 @@ func Init(g *echo.Group) {
 
 	// Add new Test
 	g.POST("", func(context echo.Context) error {
-		var testDB dao.Test
+		var testDB pingr.GenericTest
 		if err := context.Bind(&testDB); err != nil {
 			return context.String(400, "Could not parse body as test type: " + err.Error())
 		}
@@ -70,44 +73,43 @@ func Init(g *echo.Group) {
 		testDB.CreatedAt = time.Now()
 		testDB.TestId = uuid.New().String()
 
-		pTest, err := testDB.Parse()
-		if err != nil {
-			return context.String(400,"Could not parse test data: " + err.Error())
-		}
-		if !pTest.Validate() {
+		if !testDB.Validate() {
 			return context.String(400,"invalid input: Test")
 		}
 
 		db := context.Get("DB").(*sqlx.DB)
-		err = dao.PostTest(testDB, db)
+		err := dao.PostTest(testDB, db)
 		if err != nil {
 			return context.String(500, "Could not add Test to DB, " +  err.Error())
 		}
 
-		scheduler.NotifyNewTest(pTest)
+		data, err := json.Marshal(testDB)
+		if err != nil {
+			return context.String(500, fmt.Sprintf("could not marchal test: %s", err.Error()))
+		}
+		err = buz.Publish("new", data)
+		if err != nil {
+			return context.String(500, fmt.Sprintf("unable to publish new test: %s", err.Error()))
+		}
 
-		return context.JSON(200, pTest)
+		return context.JSON(200, testDB)
 	})
 
 	// Update Test
 	g.PUT("", func(context echo.Context) error {
-		var testDB dao.Test
+		var testDB  pingr.GenericTest
 		if err := context.Bind(&testDB); err != nil {
 			return context.String(400, "Could not parse body as test type")
 		}
 
 		testDB.CreatedAt = time.Now()
 
-		pTest, err := testDB.Parse()
-		if err != nil {
-			return err
-		}
-		if !pTest.Validate() {
+		if !testDB.Validate() {
 			return context.String(400,"invalid input: Test")
 		}
 
 		db := context.Get("DB").(*sqlx.DB)
-		_, err = dao.GetTest(testDB.TestId, db)
+		_, err := dao.GetTest(testDB.TestId, db)
 		if err != nil {
 			return context.String(400, "Not a valid/active testId, " + err.Error())
 		}
@@ -117,9 +119,16 @@ func Init(g *echo.Group) {
 			return context.String(500, "Could not update Test, " + err.Error())
 		}
 
-		scheduler.NotifyNewTest(pTest)
+		data, err := json.Marshal(testDB)
+		if err != nil {
+			return context.String(500, fmt.Sprintf("could not marchal test: %s", err.Error()))
+		}
+		err = buz.Publish("new", data)
+		if err != nil {
+			return context.String(500, fmt.Sprintf("unable to publish new test: %s", err.Error()))
+		}
 
-		return context.JSON(200, pTest)
+		return context.JSON(200, testDB)
 	})
 
 	// Delete Test
@@ -142,13 +151,16 @@ func Init(g *echo.Group) {
 			return context.String(500, "Could not delete the test's contacts: " + err.Error())
 		}
 
-		scheduler.NotifyDeletedTest(testId)
+		err = buz.Publish("delete", []byte(testId))
+		if err != nil {
+			return context.String(500, fmt.Sprintf("unable to publish deletion: %s", err.Error()))
+		}
 
 		return context.String(200, "Test deleted")
 	})
 
 	g.POST("/test", func(c echo.Context) error {
-		var testDB dao.Test
+		var testDB pingr.GenericTest
 		if err := c.Bind(&testDB); err != nil {
 			return c.String(400, "Could not parse body as test type: " + err.Error())
 		}
@@ -156,7 +168,7 @@ func Init(g *echo.Group) {
 		testDB.CreatedAt = time.Now()
 		testDB.TestId = uuid.New().String()
 
-		pTest, err := testDB.Parse()
+		pTest, err := testDB.Impl()
 		if err != nil {
 			return c.String(400,"Could not parse test data: " + err.Error())
 		}
@@ -164,7 +176,7 @@ func Init(g *echo.Group) {
 			return c.String(400,"invalid input: Test")
 		}
 
-		rt, err := pTest.RunTest()
+		rt, err := pTest.RunTest(buz)
 		if err != nil {
 			return c.String(200, "test failed: " + err.Error())
 		}

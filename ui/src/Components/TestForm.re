@@ -60,7 +60,7 @@ let getInitialFormState = () => {
     url: Str(""),
     interval: Int(0),
     timeout: Int(0),
-    port: Int(0),
+    port: Str(""),
     method_: Str(""),
     payload: Str(""),
     expResult: Str(""),
@@ -157,7 +157,7 @@ let portValidation = (value, values) => {
   | Str("SSH")
   | Str("TCP") =>
     switch (value) {
-    | Form.Int(i) => i > 0
+    | Form.Str(s) => s != ""
     | _ => false
     }
   /* All other tests */
@@ -312,7 +312,7 @@ let testPayloadOfState = (~inputTest=?, values) => {
   | Str("DNS")
   | Str("SSH")
   | Str("TLS")
-  | Str("TCP") => setJsonKey(blob, "method", values.method_)
+  | Str("TCP") => setJsonKey(blob, "port", values.port)
   | Str("PromeheusPush")
   | _ => ()
   };
@@ -383,9 +383,9 @@ let make = (~submitTest, ~submitContacts, ~inputTest=?, ~inputTestContacts=?) =>
   };
 
   let handleTryTest = (values, errors) => {
-    Js.log(errors);
     setSubmitted(_ => true);
     if (List.length(errors) == 0) {
+      setTryTestMsg(_ => "Loading...");
       let payload = testPayloadOfState(values);
       Api.tryTest(payload, tryTestCallback);
     };
@@ -714,7 +714,43 @@ let make = (~submitTest, ~submitContacts, ~inputTest=?, ~inputTestContacts=?) =>
                  </div>
                </>
              | Str("PrometheusPush")
-             | Str("HTTPPush") => "To be implemented" |> React.string
+             | Str("HTTPPush") =>
+               <div className="w-full md:w-1/2">
+                 <label
+                   className="block uppercase tracking-wide text-gray-700 text-xs font-bold mb-2">
+                   {"Timeout (s)" |> React.string}
+                 </label>
+                 <input
+                   value={
+                     switch (f.form.values.timeout) {
+                     | Int(i) => string_of_int(i)
+                     | _ => ""
+                     }
+                   }
+                   onChange={e =>
+                     (
+                       try(
+                         Form.Int(
+                           int_of_string(ReactEvent.Form.target(e)##value),
+                         )
+                       ) {
+                       | _ => Form.Int(0)
+                       }
+                     )
+                     |> f.handleChange(Timeout)
+                   }
+                   className="appearance-none block w-full bg-gray-200 text-gray-700 border border-gray-200 rounded py-3 px-4 leading-tight focus:outline-none focus:bg-white focus:border-gray-500"
+                   type_="number"
+                 />
+                 {getError(Timeout, f.form.errors) != React.null && submitted
+                    ? <p className="text-red-500 text-xs italic">
+                        {getError(Timeout, f.form.errors)}
+                      </p>
+                    : <p className="text-gray-600 text-xs italic">
+                        {"The maximum number of seconds between each push (*)"
+                         |> React.string}
+                      </p>}
+               </div>
              | Str("") => <div />
              | _ => <p> {"Invalid type" |> React.string} </p>
              }}
@@ -781,24 +817,16 @@ let make = (~submitTest, ~submitContacts, ~inputTest=?, ~inputTestContacts=?) =>
                  <input
                    value={
                      switch (f.form.values.port) {
-                     | Int(i) => string_of_int(i)
+                     | Str(s) => s
                      | _ => ""
                      }
                    }
                    onChange={e =>
-                     (
-                       try(
-                         Form.Int(
-                           int_of_string(ReactEvent.Form.target(e)##value),
-                         )
-                       ) {
-                       | _ => Form.Int(0)
-                       }
-                     )
+                     Form.Str(ReactEvent.Form.target(e)##value)
                      |> f.handleChange(Port)
                    }
                    className="appearance-none block w-full bg-gray-200 text-gray-700 border border-gray-200 rounded py-3 px-4 leading-tight focus:outline-none focus:bg-white focus:border-gray-500"
-                   type_="number"
+                   type_="text"
                  />
                  {getError(Port, f.form.errors) != React.null && submitted
                     ? <p className="text-red-500 text-xs italic">
@@ -882,7 +910,7 @@ let make = (~submitTest, ~submitContacts, ~inputTest=?, ~inputTestContacts=?) =>
               {!validThreshold() && submitted
                  ? <p className="text-red-500 text-xs italic">
                      {"Threshold has to be > 0" |> React.string}
-                   </p>  /* TODO: better error */
+                   </p>
                  : <p className="text-gray-600 text-xs italic">
                      {"Who should be contacted upon error and after how many consecutive test failures"
                       |> React.string}
@@ -900,7 +928,7 @@ let make = (~submitTest, ~submitContacts, ~inputTest=?, ~inputTestContacts=?) =>
               {"Submit" |> React.string}
             </button>
             {tryTestMsg != ""
-               ? <p className="text-gray-600 m-2">
+               ? <p className="text-gray-600 mb-2">
                    {tryTestMsg |> React.string}
                  </p>
                : React.null}

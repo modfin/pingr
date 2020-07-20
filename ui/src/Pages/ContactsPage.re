@@ -60,7 +60,7 @@ let make = () => {
   );
   <>
     <div className="relative bg-gray-400 my-4 p-1">
-      <p className="text-xl font-bold"> {"Contacts" |> React.string} </p>
+      <p className="text-xl font-bold ml-1"> {"Contacts" |> React.string} </p>
       <button
         onClick={_event => Paths.goToNewContact()}
         className="m-1 bg-green-500 hover:bg-green-700 text-white py-1 px-2 rounded">
@@ -72,7 +72,7 @@ let make = () => {
      | Failed(msg) => <div> {ReasonReact.string(msg)} </div>
      | Success(contacts) =>
        <>
-         <table className="table-auto text-left">
+         <table className="table-auto text-left mx-2">
            <thead>
              <tr>
                <th className="px-4 py-2"> {"Name" |> React.string} </th>
@@ -86,11 +86,7 @@ let make = () => {
                 |> List.map(contact => {
                      <tr key={contact.contactId}>
                        <td className="border px-4 py-2">
-                         <a
-                           className="no-underline text-blue-500 hover:underline cursor-pointer"
-                           onClick={_event => Paths.goToTests()}>
-                           {contact.contactName |> React.string}
-                         </a>
+                         {contact.contactName |> React.string}
                        </td>
                        <td className="border px-4 py-2">
                          {contact.contactType |> React.string}
@@ -103,7 +99,7 @@ let make = () => {
                            onClick={_e =>
                              Paths.goToEditContact(contact.contactId)
                            }
-                           className="m-1 bg-blue-500 hover:bg-blue-700 text-white py-1 px-2 rounded">
+                           className="ml-1 bg-blue-500 hover:bg-blue-700 text-white py-1 px-2 rounded">
                            {"Edit" |> React.string}
                          </button>
                        </td>
@@ -132,7 +128,7 @@ let make = () => {
            </tbody>
          </table>
          {responseMsg != ""
-            ? <p className="text-gray-500 text-xs italic">
+            ? <p className="text-gray-500 text-xs italic mx-2">
                 {responseMsg |> React.string}
               </p>
             : React.null}
