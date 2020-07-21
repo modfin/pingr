@@ -1,26 +1,33 @@
 package dao
 
 import (
-	"github.com/gchaincl/dotsql"
 	"github.com/jmoiron/sqlx"
+	log "github.com/sirupsen/logrus"
 	"os"
+	"pingr/internal/config"
 )
 
 func InitDB() (*sqlx.DB, error) {
-	if !fileExists("data.db") {
-		file, err := os.Create("data.db")
+	dbfile := config.Get().SQLitePath
+
+	var isnew bool
+	if !fileExists(dbfile) {
+		isnew = true
+		file, err := os.Create(dbfile)
 		if err != nil {
 			return nil, err
 		}
 		file.Close()
 	}
 
-	db, err := sqlx.Open("sqlite3", "data.db")
+	db, err := sqlx.Open("sqlite3", dbfile)
 	if err != nil {
 		return nil, err
 	}
 
-	err = setupTables(db)
+	if isnew || config.Get().SQLiteMigrate {
+		err = migrateSchema(db)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -28,37 +35,28 @@ func InitDB() (*sqlx.DB, error) {
 	return db, nil
 }
 
-func setupTables(db *sqlx.DB) error {
-	dot, err := dotsql.LoadFromFile("./_schema/001.tables.up.sql")
+func migrateSchema(db *sqlx.DB) error {
+	log.Info("Migrating sql schema")
+	_, err := db.Exec(_schema_v0_up)
 	if err != nil {
 		return err
+	}
+	var version int
+	err = db.Get(&version, "SELECT max(version) FROM _schema")
+	if err != nil {
+		return err
+	}
+	log.Info("  - Currently at ", version)
+
+	switch version {
+	case 0:
+		log.Info("  - Migrating to ", 1)
+		_, err := db.Exec(_schema_v1_up)
+		if err != nil {
+			return err
+		}
 	}
 
-	_, err = dot.Exec(db, "create-tests-table")
-	if err != nil {
-		return err
-	}
-
-	_, err = dot.Exec(db, "create-status-map-table")
-	if err != nil {
-		return err
-	}
-	_, err = dot.Exec(db, "init-status-mapper") // Will throw error if map table exists
-
-	_, err = dot.Exec(db, "create-contacts-table")
-	if err != nil {
-		return err
-	}
-
-	_, err = dot.Exec(db, "create-test-contact-mapper")
-	if err != nil {
-		return err
-	}
-
-	_, err = dot.Exec(db, "create-logs-table")
-	if err != nil {
-		return err
-	}
 
 	return nil
 }

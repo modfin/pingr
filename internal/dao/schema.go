@@ -1,3 +1,34 @@
+package dao
+
+
+const _schema_v0_up = `
+CREATE TABLE IF NOT EXISTS _schema( 
+    version int PRIMARY KEY,
+	created_at TIMESTAMP
+);
+INSERT INTO _schema(version, created_at) VALUES (0, CURRENT_TIMESTAMP) ON CONFLICT DO NOTHING;
+`
+
+
+const _schema_v1_down = `
+-- name: drop-test-contact-mapper
+DROP TABLE IF EXISTS test_contacts ;
+
+-- name: drop-contacts-table
+DROP TABLE IF EXISTS contacts ;
+
+-- name: drop-status-map-table
+DROP TABLE IF EXISTS status_map ;
+
+-- name: drop-logs-table
+DROP TABLE IF EXISTS logs ;
+
+-- name: -tests-table
+DROP TABLE IF EXISTS tests ;
+
+`
+
+const _schema_v1_up = `
 -- name: create-tests-table
 CREATE TABLE IF NOT EXISTS tests (
     test_id TEXT PRIMARY KEY,
@@ -19,7 +50,8 @@ CREATE TABLE IF NOT EXISTS tests (
     timeout  INTEGER NOT NULL,
     created_at TIMESTAMP NOT NULL,
     blob BLOB
-);
+)
+;
 
 -- name: create-logs-table
 CREATE TABLE IF NOT EXISTS logs (
@@ -30,17 +62,19 @@ CREATE TABLE IF NOT EXISTS logs (
     response_time INTEGER,
     created_at TIMESTAMP NOT NULL,
     FOREIGN KEY (test_id)
-        REFERENCES tests (test_id)
+        REFERENCES tests (test_id),
     FOREIGN KEY (status_id)
         REFERENCES status_map (status_id)
-);
+)
+;
 
 -- name: create-status-map-table
 CREATE TABLE IF NOT EXISTS status_map (
     status_id  INTEGER PRIMARY KEY NOT NULL,
     status_name TEXT NOT NULL,
     UNIQUE (status_id, status_name)
-);
+)
+;
 
 -- name: create-contacts-table
 CREATE TABLE IF NOT EXISTS contacts (
@@ -49,7 +83,7 @@ CREATE TABLE IF NOT EXISTS contacts (
     contact_type TEXT NOT NULL,
     contact_url TEXT NOT NULL
 )
-
+;
 -- name: create-test-contact-mapper
 CREATE TABLE IF NOT EXISTS test_contacts (
     test_id TEXT NOT NULL,
@@ -57,10 +91,10 @@ CREATE TABLE IF NOT EXISTS test_contacts (
     threshold INTEGER NOT NULL,
     UNIQUE (contact_id, test_id),
     FOREIGN KEY (test_id)
-        REFERENCES tests (test_id)
+        REFERENCES tests (test_id),
     FOREIGN KEY (contact_id)
         REFERENCES contacts (contact_id)
-)
+);
 
 -- name: init-status-mapper
 INSERT INTO status_map(status_id, status_name)
@@ -69,4 +103,6 @@ VALUES
     (2, "Error"),
     (3, "TimedOut"),
     (5, "Initialized"),
-    (6, "Deleted");
+    (6, "Deleted")
+;
+`
