@@ -8,6 +8,7 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/sirupsen/logrus"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
 	"path"
 	"path/filepath"
@@ -44,6 +45,15 @@ func Init(closing <-chan struct{}, db *sqlx.DB, buz *bus.Bus) {
 
 	// UI
 	e.GET("/*", func(c echo.Context) error {
+		if config.Get().Dev {
+			u, err := url.Parse("http://ui:8080")
+			if err != nil{
+				return err
+			}
+			proxy := httputil.NewSingleHostReverseProxy(u)
+			proxy.ServeHTTP( c.Response().Writer, c.Request())
+			return nil
+		}
 		p, err := url.PathUnescape(c.Param("*"))
 		if  err != nil{
 			return err
@@ -51,14 +61,12 @@ func Init(closing <-chan struct{}, db *sqlx.DB, buz *bus.Bus) {
 		if p == ""{
 			p = "index.html"
 		}
-		if config.Get().Dev {
-			name := filepath.Join("./ui/dist", path.Clean("/"+p)) // "/"+ for security
-			return c.File(name)
-		}
 		name := filepath.Join("build", path.Clean(p))
 		data, err := ui.Asset(name)
 		if  err != nil{
-
+			data, err = ui.Asset(filepath.Join("build", path.Clean("index.html")))
+		}
+		if  err != nil{
 			return err
 		}
 		return c.Blob(200, http.DetectContentType(data), data)

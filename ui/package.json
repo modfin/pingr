@@ -4,11 +4,17 @@
   "main": "index.js",
   "license": "MIT",
   "scripts": {
-    "dev": "npm-run-all --parallel start serve",
-    "start": "bsb -make-world -w",
-    "serve": "parcel serve -p 8081 --hmr-port 8082 index.html",
-    "build:css": "postcss src/tailwind.css -o src/main.css",
-    "prestart": "npm run build:css"
+    "clean:css": "rm -rf ./lib/css",
+    "clean:js": "rm -rf ./lib/js",
+    "clean:bs": "bsb -clean-world && rm -rf ./lib/bs && rm -rf .bsb.lock",
+    "clean": "npm-run-all clean:*",
+    "make:bs": "bsb -make-world",
+    "make:css": "postcss src/tailwind.css -o lib/css/main.css",
+    "make": "npm-run-all make:*",
+    "watch:bs": "bsb -make-world -w < /dev/zero",
+    "watch:parcel": "parcel watch index.html",
+    "serve": "parcel serve -p 8080 --hmr-port 8081 index.html",
+    "dev": "npm-run-all --serial clean make --parallel watch:bs serve"
   },
   "devDependencies": {
     "autoprefixer": "^9.8.5",

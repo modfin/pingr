@@ -2,10 +2,14 @@
 .env
 *.db
 *.sqlite
-node_modules
 .cache
-ui/lib
-*.bs.js
 *.log
+*.bs.js
+ui/node_modules
+ui/lib
 ui/build
 ui/dist
+ui/.bsb.lock
+ui/.config
+ui/.npm
+ui/.merlin

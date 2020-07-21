@@ -20,3 +20,18 @@ services:
     volumes:
       - gopkg:/go/pkg
       - .:/go/src/pingr
+
+  ui:
+    build:
+      context: .
+      dockerfile: Dockerfile.ui.dev
+      args:
+        UID: ${UID}
+    environment:
+      DEV: |-
+        true
+    ports:
+      - "8081:8081"
+#      - "8080:8080"
+    volumes:
+      - ./ui:/ui
