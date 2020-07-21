@@ -4,17 +4,24 @@
   "main": "index.js",
   "license": "MIT",
   "scripts": {
+    "dev": "npm-run-all --serial clean make --parallel watch:bs watch:css serve:parcel",
+    "serve:parcel": "parcel serve -p 8080 --hmr-port 8081 index.html",
+    "clean": "npm-run-all clean:*",
     "clean:css": "rm -rf ./lib/css",
     "clean:js": "rm -rf ./lib/js",
     "clean:bs": "bsb -clean-world && rm -rf ./lib/bs && rm -rf .bsb.lock",
-    "clean": "npm-run-all clean:*",
+    "clean:build": "rm -rf ./build",
+    "clean:dist": "rm -rf ./dist",
+    "make": "npm-run-all make:*",
     "make:bs": "bsb -make-world",
     "make:css": "postcss src/tailwind.css -o lib/css/main.css",
-    "make": "npm-run-all make:*",
     "watch:bs": "bsb -make-world -w < /dev/zero",
+    "watch:css": "postcss src/tailwind.css --watch -o lib/css/main.css",
     "watch:parcel": "parcel watch index.html",
-    "serve": "parcel serve -p 8080 --hmr-port 8081 index.html",
-    "dev": "npm-run-all --serial clean make --parallel watch:bs serve"
+    "build": "npm-run-all --serial clean build:css build:bs build:parcel",
+    "build:bs": "bsb -make-world",
+    "build:css": "postcss src/tailwind.css --env production -o lib/css/main.css",
+    "build:parcel": "parcel build --no-source-maps --out-dir build --public-url / --target browser index.html"
   },
   "devDependencies": {
     "autoprefixer": "^9.8.5",

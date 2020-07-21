@@ -17,4 +17,5 @@ require (
 	github.com/sirupsen/logrus v1.6.0
 	github.com/tatsushid/go-fastping v0.0.0-20160109021039-d7bb493dee3e
 	golang.org/x/crypto v0.0.0-20200221231518-2aa609cf4a9d
+	google.golang.org/appengine v1.6.6 // indirect
 )

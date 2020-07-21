@@ -1,19 +1,14 @@
-FROM golang:1.13
+FROM golang:1.13-alpine
+RUN apk add git curl build-base bash openssh-client shadow
 
 RUN go get github.com/mattn/go-sqlite3 && \
     go install github.com/mattn/go-sqlite3 &&\
-    go get -u -v github.com/codeskyblue/fswatch &&\
-    go get -u github.com/go-bindata/go-bindata/...
-
-
-
+    go get -u -v github.com/codeskyblue/fswatch
 
 
 ## Mount src/pingr
-
-
-
-RUN echo "desc: re builds go  \n\
+SHELL ["/bin/bash", "-c"]
+RUN echo -e "desc: re builds go  \n\
 triggers:  \n\
   - name: ''  \n\
     pattens: \n\
@@ -35,15 +30,10 @@ watch_depth: 10  \n\
 
 
 
-
-
-
-#ARG UID
-#RUN groupadd --gid $UID pingr && useradd --uid $UID --gid pingr --shell /bin/bash --create-home pingr
-#USER pingr
-#RUN mkdir -p /go/src/pingr &&  mkdir -p /go/pkg
+ARG UID
+RUN groupadd --gid $UID pingr && useradd --uid $UID --gid pingr --create-home pingr
+RUN chown -R pingr:pingr /go
+USER pingr
 WORKDIR /go/src/pingr
 
-# run fswatch
-#CMD ./start.sh
 CMD fswatch -config /fsw.yml
