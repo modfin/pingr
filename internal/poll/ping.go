@@ -14,11 +14,12 @@ func Ping(hostname string, timeOut time.Duration) (responseTime time.Duration, e
 		return
 	}
 
+	_, _ = p.Network("udp")
 	p.AddIPAddr(ra)
 
 	p.MaxRTT = timeOut
 
-	start:=time.Now()
+	start := time.Now()
 	err = p.Run()
 	responseTime = time.Since(start)
 
