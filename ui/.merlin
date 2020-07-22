@@ -20,4 +20,6 @@ S src/Pages
 B lib/bs/src/Pages
 S src/Components
 B lib/bs/src/Components
+S src/Components/Forms
+B lib/bs/src/Components/Forms
 ####BSB GENERATED: NO EDIT}

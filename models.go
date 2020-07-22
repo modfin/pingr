@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/jmoiron/sqlx/types"
-	log "github.com/sirupsen/logrus"
 	"pingr/internal/bus"
 	"pingr/internal/poll"
 	"pingr/internal/push"
@@ -251,7 +250,6 @@ type TCPTest struct {
 }
 
 func (t TCPTest) RunTest(*bus.Bus) (time.Duration, error) {
-	log.Info(t)
 	return poll.TCP(t.Url, t.Blob.Port, t.Timeout)
 }
 
@@ -316,7 +314,7 @@ type HTTPTest struct {
 }
 
 func (t HTTPTest) RunTest(*bus.Bus) (time.Duration, error) {
-	return poll.HTTP(t.Url, t.Blob.ReqMethod, t.Timeout*time.Second, []byte(t.Blob.ReqBody), []byte(t.Blob.ResBody))
+	return poll.HTTP(t.Url, t.Blob.ReqMethod, t.Timeout*time.Second, t.Blob.ReqHeaders, t.Blob.ReqBody, t.Blob.ResStatus, t.Blob.ResHeaders, t.Blob.ResBody)
 }
 
 func (t HTTPTest) Validate() bool {

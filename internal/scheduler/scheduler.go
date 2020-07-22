@@ -470,7 +470,6 @@ func (s *Scheduler) discSpaceMaintainer(db *sqlx.DB) {
 		}
 		time.Sleep(time.Hour)
 	}
-
 }
 
 func intInSlice(a string, list []pingr.GenericTest) bool {

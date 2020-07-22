@@ -1,7 +1,8 @@
 type t =
   | Str(string)
   | Float(float)
-  | Int(int);
+  | Int(int)
+  | List(list((string, string)));
 
 type validation('a) =
   | NotEmpty
@@ -12,6 +13,7 @@ let validate = (rule, value, values) =>
   | (NotEmpty, Str(s)) => s != ""
   | (NotEmpty, Int(i)) => i > 0
   | (NotEmpty, Float(f)) => f > 0.
+  | (NotEmpty, List(l)) => List.length(l) > 0
   | (Custom(fn), _) => fn(value, values)
   };
 

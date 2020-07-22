@@ -70,11 +70,13 @@ let make = (~id) => {
           {"Test status: " ++ test.testName |> React.string}
         </p>
         <button
+          type_="button"
           onClick={_e => Paths.goToEditTest(id)}
           className="m-1 bg-blue-500 hover:bg-blue-700 text-white py-1 px-2 rounded">
           {"Edit" |> React.string}
         </button>
         <button
+          type_="button"
           onClick={_e => Api.deleteTest(test.testId, deleteCallback)}
           className="m-1 bg-red-500 hover:bg-red-700 text-white py-1 px-2 rounded">
           {"Delete" |> React.string}
@@ -112,22 +114,22 @@ let make = (~id) => {
            | TCP(port) => <DataField labelName="Port" value={port.port} />
            | HTTP(http) =>
              <>
-               <DataField labelName="Method" value={http.method_} />
+               <DataField labelName="Method" value={http.reqMethod} />
                <DataField
                  labelName="Payload"
                  value={
-                   switch (http.payload) {
+                   switch (http.reqBody) {
                    | None => "-"
-                   | Some(payload) => payload
+                   | Some(reqBody) => reqBody
                    }
                  }
                />
                <DataField
                  labelName="Expected response"
                  value={
-                   switch (http.expResult) {
+                   switch (http.resBody) {
                    | None => "-"
-                   | Some(expResult) => expResult
+                   | Some(resBody) => resBody
                    }
                  }
                />

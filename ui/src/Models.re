@@ -1,8 +1,11 @@
 module Test = {
   type http = {
-    method_: string,
-    payload: option(string),
-    expResult: option(string),
+    reqMethod: string,
+    reqHeaders: option(Js.Dict.t(string)),
+    reqBody: option(string),
+    resStatus: option(int),
+    resHeaders: option(Js.Dict.t(string)),
+    resBody: option(string),
   };
 
   type promMetric = {
@@ -75,9 +78,14 @@ module Decode = {
       | "HTTP" =>
         Decode.(
           Test.HTTP({
-            method_: json |> field("req_method", string),
-            expResult: json |> field("res_body", optional(string)),
-            payload: json |> field("req_body", optional(string)),
+            reqMethod: json |> field("req_method", string),
+            reqHeaders:
+              json |> field("req_headers", optional(dict(string))),
+            reqBody: json |> field("req_body", optional(string)),
+            resStatus: json |> field("res_status", optional(int)),
+            resHeaders:
+              json |> field("res_headers", optional(dict(string))),
+            resBody: json |> field("res_body", optional(string)),
           })
         )
       | "Prometheus" =>

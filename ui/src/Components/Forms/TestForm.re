@@ -481,7 +481,7 @@ let make = (~submitTest, ~submitContacts, ~inputTest=?, ~inputTestContacts=?) =>
                          initState.timeout = Int(test.timeout);
                          switch (test.specific) {
                          | HTTP(http) =>
-                           initState.method_ = Str(http.method_)
+                           initState.method_ = Str(http.reqMethod)
                          | _ => () /*TODO: add all fields*/
                          };
                        | None => ()
