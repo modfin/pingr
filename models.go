@@ -302,7 +302,7 @@ func (t PingTest) Validate() bool {
 
 type HTTPTest struct {
 	Blob struct {
-		ReqMethod  string            `json:"req_method""`
+		ReqMethod  string            `json:"req_method"`
 		ReqHeaders map[string]string `json:"req_headers"`
 		ReqBody    string            `json:"req_body"`
 
@@ -319,11 +319,13 @@ func (t HTTPTest) RunTest(*bus.Bus) (time.Duration, error) {
 
 func (t HTTPTest) Validate() bool {
 	if !t.BaseTest.Validate() {
+		fmt.Println("ERROR IN BASE TEST")
 		return false
 	}
 	switch t.Blob.ReqMethod {
 	case "GET", "POST", "PUT", "HEAD", "DELETE":
 	default:
+		fmt.Println("BAD METHOD")
 		return false
 	}
 	return true

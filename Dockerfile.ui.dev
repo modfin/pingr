@@ -1,0 +1,23 @@
+FROM node:14
+
+RUN deluser --remove-home node
+
+ARG UID
+
+RUN groupadd -g ${UID} ui && useradd -u ${UID} -g ${UID} ui
+RUN echo "ui:ui" | chpasswd
+RUN mkdir /ui
+RUN mkdir /home/ui
+RUN mkdir /home/ui/.npm
+RUN chown -R ${UID}:${UID} /ui
+RUN chown -R ${UID}:${UID} /home/ui
+RUN chown -R ${UID}:${UID} /usr/local/lib/node_modules
+RUN chown -R ${UID}:${UID} /usr/local/bin
+RUN chown -R ${UID}:${UID} /usr/local/share
+
+WORKDIR /ui
+USER ui
+RUN mkdir -p /home/ui/.config
+
+CMD npm i \
+    && npm run dev

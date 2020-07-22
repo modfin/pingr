@@ -8,18 +8,18 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/sirupsen/logrus"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
 	"path"
-	"path/filepath"
 	"pingr/internal/bus"
 	"pingr/internal/config"
 	"pingr/internal/logging"
 	"pingr/internal/resources/contacts"
 	"pingr/internal/resources/health"
-	"pingr/internal/resources/testcontacts"
-	"pingr/internal/resources/tests"
 	"pingr/internal/resources/logs"
 	"pingr/internal/resources/push"
+	"pingr/internal/resources/testcontacts"
+	"pingr/internal/resources/tests"
 	"pingr/ui"
 )
 
@@ -44,28 +44,33 @@ func Init(closing <-chan struct{}, db *sqlx.DB, buz *bus.Bus) {
 
 	// UI
 	e.GET("/*", func(c echo.Context) error {
+		if config.Get().Dev {
+			u, err := url.Parse("http://ui:8080")
+			if err != nil {
+				return err
+			}
+			proxy := httputil.NewSingleHostReverseProxy(u)
+			proxy.ServeHTTP(c.Response().Writer, c.Request())
+			return nil
+		}
 		p, err := url.PathUnescape(c.Param("*"))
-		if  err != nil{
+		if err != nil {
 			return err
 		}
-		if p == ""{
+		if p == "" {
 			p = "index.html"
 		}
-		if config.Get().Dev {
-			name := filepath.Join("./ui/dist", path.Clean("/"+p)) // "/"+ for security
-			return c.File(name)
+		data, err := ui.Asset(path.Clean(p))
+		if err != nil {
+			data, err = ui.Asset(path.Clean("index.html"))
 		}
-		name := filepath.Join("build", path.Clean(p))
-		data, err := ui.Asset(name)
-		if  err != nil{
-
+		if err != nil {
 			return err
 		}
 		return c.Blob(200, http.DetectContentType(data), data)
 	})
 
 	go e.Start(fmt.Sprintf(":%d", config.Get().Port))
-
 
 	<-closing
 	c, cancel := context.WithTimeout(context.Background(), config.Get().TermDuration)
