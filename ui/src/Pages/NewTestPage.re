@@ -31,11 +31,55 @@ let make = () => {
         />
       </div>
       {switch (testType) {
-       | Str("HTTP") => <HTTPForm submitTest=Api.postTest />
-       | _ => <PingForm submitTest=Api.postTest />
+       | Str("HTTP") =>
+         <HTTPForm
+           submitTest=Api.postTest
+           submitContacts=Api.postTestContacts
+         />
+       | Str("Ping") =>
+         <PingForm
+           submitTest=Api.postTest
+           submitContacts=Api.postTestContacts
+         />
+       | Str("TCP") =>
+         <PortTestForm
+           testType="TCP"
+           submitTest=Api.postTest
+           submitContacts=Api.postTestContacts
+         />
+       | Str("TLS") =>
+         <PortTestForm
+           testType="TLS"
+           submitTest=Api.postTest
+           submitContacts=Api.postTestContacts
+         />
+       | Str("Prometheus") =>
+         <PrometheusForm
+           submitTest=Api.postTest
+           submitContacts=Api.postTestContacts
+         />
+       | Str("DNS") =>
+         <DNSForm
+           submitTest=Api.postTest
+           submitContacts=Api.postTestContacts
+         />
+       | Str("SSH") =>
+         <SSHForm
+           submitTest=Api.postTest
+           submitContacts=Api.postTestContacts
+         />
+       | Str("HTTPPush") =>
+         <HTTPPushForm
+           submitTest=Api.postTest
+           submitContacts=Api.postTestContacts
+         />
+       | Str("PrometheusPush") =>
+         <PrometheusPushForm
+           submitTest=Api.postTest
+           submitContacts=Api.postTestContacts
+         />
        | _ => React.null
        }}
     </div>
-    /*<TestForm submitTest=Api.postTest submitContacts=Api.postTestContacts />*/
   </>;
 };

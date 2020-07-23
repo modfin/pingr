@@ -49,7 +49,11 @@ let payloadOfState = (~inputContact=?, values) => {
     Models.Contact.(
       switch (contact) {
       | Some(contact_) =>
-        TestForm.setJsonKey(payload, "contact_id", Str(contact_.contactId))
+        FormHelpers.setJsonKey(
+          payload,
+          "contact_id",
+          Str(contact_.contactId),
+        )
       | None => ()
       }
     )
@@ -57,9 +61,9 @@ let payloadOfState = (~inputContact=?, values) => {
   | None => ()
   };
 
-  TestForm.setJsonKey(payload, "contact_name", values.contactName);
-  TestForm.setJsonKey(payload, "contact_type", values.contactType);
-  TestForm.setJsonKey(payload, "contact_url", values.contactUrl);
+  FormHelpers.setJsonKey(payload, "contact_name", values.contactName);
+  FormHelpers.setJsonKey(payload, "contact_type", values.contactType);
+  FormHelpers.setJsonKey(payload, "contact_url", values.contactUrl);
 
   payload;
 };
@@ -74,6 +78,7 @@ let make = (~submitContact, ~inputContact: option(Models.Contact.t)=?) => {
     switch (resp) {
     | Api.Error(msg) => setErrorMsg(_ => msg)
     | Api.Success(_) => Paths.goToContacts()
+    | Api.SuccessJSON(_) => Paths.goToContacts()
     };
   };
 
@@ -81,6 +86,7 @@ let make = (~submitContact, ~inputContact: option(Models.Contact.t)=?) => {
     switch (resp) {
     | Api.Error(msg) => setErrorMsg(_ => msg)
     | Api.Success(msg) => setTryTestMsg(_ => msg)
+    | Api.SuccessJSON(_) => Paths.goToContacts()
     };
   };
 
@@ -96,6 +102,7 @@ let make = (~submitContact, ~inputContact: option(Models.Contact.t)=?) => {
   let handleTryContact = (values, errors) => {
     setSubmitted(_ => true);
     if (List.length(errors) == 0) {
+      setTryTestMsg(_ => "Loading...");
       let payload = payloadOfState(values);
       Api.tryContact(payload, testContactCallback);
     };
@@ -156,7 +163,8 @@ let make = (~submitContact, ~inputContact: option(Models.Contact.t)=?) => {
                   </svg>
                 </div>
               </div>
-              {let errorMsg = TestForm.getError(ContactType, f.form.errors);
+              {let errorMsg =
+                 FormHelpers.getError(ContactType, f.form.errors);
                errorMsg != React.null && submitted
                  ? <p className="text-red-500 text-xs italic"> errorMsg </p>
                  : <p className="text-gray-600 text-xs italic">
@@ -183,10 +191,10 @@ let make = (~submitContact, ~inputContact: option(Models.Contact.t)=?) => {
                 type_="text"
                 placeholder="The name of the contact"
               />
-              {TestForm.getError(ContactName, f.form.errors) != React.null
+              {FormHelpers.getError(ContactName, f.form.errors) != React.null
                && submitted
                  ? <p className="text-red-500 text-xs italic">
-                     {TestForm.getError(ContactName, f.form.errors)}
+                     {FormHelpers.getError(ContactName, f.form.errors)}
                    </p>
                  : <p className="text-gray-600 text-xs italic">
                      {"Contact's name, no functional meaning (*)"
@@ -213,10 +221,10 @@ let make = (~submitContact, ~inputContact: option(Models.Contact.t)=?) => {
                 type_="text"
                 placeholder="https://example.com"
               />
-              {TestForm.getError(ContactUrl, f.form.errors) != React.null
+              {FormHelpers.getError(ContactUrl, f.form.errors) != React.null
                && submitted
                  ? <p className="text-red-500 text-xs italic">
-                     {TestForm.getError(ContactUrl, f.form.errors)}
+                     {FormHelpers.getError(ContactUrl, f.form.errors)}
                    </p>
                  : <p className="text-gray-600 text-xs italic">
                      {"Email/Hook url (*)" |> React.string}
@@ -235,12 +243,12 @@ let make = (~submitContact, ~inputContact: option(Models.Contact.t)=?) => {
             {"Submit" |> React.string}
           </button>
           {tryTestMsg != ""
-             ? <p className="text-gray-600 m-2">
+             ? <p className="text-gray-600 m-1">
                  {tryTestMsg |> React.string}
                </p>
              : React.null}
           {errorMsg != ""
-             ? <p className="text-red-500 text-xs italic">
+             ? <p className="text-red-500 text-xs italic m-1">
                  {"Error posting contact: " ++ errorMsg |> React.string}
                </p>
              : React.null}

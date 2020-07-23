@@ -11,10 +11,7 @@ type action =
   | LoadFail(string);
 
 [@react.component]
-let make = () => {
-  let (testContacts: list((string, string)), setTestContacts) =
-    React.useState(_ => []);
-
+let make = (~value, ~onChange, ~errorMsg) => {
   let (state, dispatch) =
     React.useReducer(
       (_state, action) =>
@@ -37,49 +34,35 @@ let make = () => {
     None;
   });
 
-  let updateTestContacts = (checked, contact: (string, string)) =>
+  let updateTestContacts = (checked, contact: (string, string), currContacts) =>
     if (checked) {
-      setTestContacts(prev => prev @ [contact]);
+      currContacts @ [contact];
     } else {
-      setTestContacts(prev =>
-        prev |> List.filter(testContact => testContact != contact)
-      );
+      currContacts |> List.filter(testContact => testContact != contact);
     };
 
-  let updateThreshold = (contact: (string, string)) => {
+  let updateThreshold = (contact: (string, string), currContacts) => {
     let id = fst(contact);
-    setTestContacts(prev =>
-      prev
-      |> List.map(((id2, threshold)) =>
-           if (id == id2) {
-             contact;
-           } else {
-             (id2, threshold);
-           }
-         )
-    );
+    currContacts
+    |> List.map(((id2, threshold)) =>
+         if (id == id2) {
+           contact;
+         } else {
+           (id2, threshold);
+         }
+       );
   };
 
-  let isChecked = id =>
-    switch (testContacts |> List.find(contact => fst(contact) == id)) {
+  let isChecked = (id, currContacts) =>
+    switch (currContacts |> List.find(contact => fst(contact) == id)) {
     | exception Not_found => false
     | _contact => true
     };
-  let getThreshold = id =>
-    switch (testContacts |> List.find(contact => fst(contact) == id)) {
+  let getThreshold = (id, currContacts) =>
+    switch (currContacts |> List.find(contact => fst(contact) == id)) {
     | exception Not_found => ""
-    | testContact => fst(testContact)
+    | testContact => snd(testContact)
     };
-
-  let validThreshold = () => {
-    switch (
-      testContacts
-      |> List.find(testContact => int_of_string(snd(testContact)) <= 0)
-    ) {
-    | exception Not_found => true
-    | _testContact => false
-    };
-  };
 
   <div className="w-full">
     <label
@@ -107,11 +90,16 @@ let make = () => {
                    <tr key={contact.contactId}>
                      <td className="border px-4 py-2">
                        <input
-                         checked={isChecked(contact.contactId)}
+                         checked={value |> isChecked(contact.contactId)}
                          onChange={e =>
-                           updateTestContacts(
-                             ReactEvent.Form.target(e)##checked,
-                             (contact.contactId, "0"),
+                           onChange(
+                             Form.TupleList(
+                               updateTestContacts(
+                                 ReactEvent.Form.target(e)##checked,
+                                 (contact.contactId, "0"),
+                                 value,
+                               ),
+                             ),
                            )
                          }
                          className="mr-2 leading-tight"
@@ -127,13 +115,20 @@ let make = () => {
                          type_="number"
                          min="0"
                          onChange={e =>
-                           updateThreshold((
-                             contact.contactId,
-                             ReactEvent.Form.target(e)##value,
-                           ))
+                           onChange(
+                             Form.TupleList(
+                               updateThreshold(
+                                 (
+                                   contact.contactId,
+                                   ReactEvent.Form.target(e)##value,
+                                 ),
+                                 value,
+                               ),
+                             ),
+                           )
                          }
-                         value={getThreshold(contact.contactId)}
-                         disabled={!isChecked(contact.contactId)}
+                         value={value |> getThreshold(contact.contactId)}
+                         disabled={!isChecked(contact.contactId, value)}
                        />
                      </td>
                    </tr>
@@ -144,10 +139,8 @@ let make = () => {
          </tbody>
        </table>
      }}
-    {!validThreshold()
-       ? <p className="text-red-500 text-xs italic">
-           {"Threshold has to be > 0" |> React.string}
-         </p>
+    {errorMsg != React.null
+       ? <p className="text-red-500 text-xs italic"> errorMsg </p>
        : <p className="text-gray-600 text-xs italic">
            {"Who should be contacted upon error and after how many consecutive test failures"
             |> React.string}

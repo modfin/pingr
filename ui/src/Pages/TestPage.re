@@ -138,7 +138,7 @@ let make = (~id) => {
              Models.Test.(
                {
                  promMetrics.metrics
-                 |> Array.mapi((i, pMetric) => {
+                 |> List.mapi((i, pMetric) => {
                       <div key={pMetric.key}>
                         <DataField
                           labelName={"Key " ++ string_of_int(i)}
@@ -147,39 +147,58 @@ let make = (~id) => {
                         <div className="ml-10 md:mr-5">
                           <DataField
                             labelName="Lower bound"
-                            value={string_of_float(pMetric.lowerBound)}
+                            value={Js.Float.toString(pMetric.lowerBound)}
                           />
                           <DataField
                             labelName="Upper bound"
-                            value={string_of_float(pMetric.upperBound)}
+                            value={Js.Float.toString(pMetric.upperBound)}
                           />
                           <DataField
                             labelName="Labels"
                             value={
-                              switch (pMetric.labels) {
-                              | None => "-"
-                              | Some(labels) =>
-                                let keys = Js.Dict.keys(labels);
-                                let values = Js.Dict.values(labels);
-                                let dictString = ref("{ ");
-                                for (i in 0 to Array.length(keys) - 1) {
-                                  dictString :=
-                                    dictString^
-                                    ++ keys[i]
-                                    ++ ": "
-                                    ++ values[i]
-                                    ++ ", ";
-                                };
-                                dictString := dictString^ ++ "}";
-                                dictString^;
-                              }
-                            }
+                                    let dictString = ref("{ ");
+                                    for (i in
+                                         0 to
+                                         List.length(pMetric.labels) - 1) {
+                                      dictString :=
+                                        dictString^
+                                        ++ fst(List.nth(pMetric.labels, i))
+                                        ++ ": "
+                                        ++ snd(List.nth(pMetric.labels, i))
+                                        ++ ", ";
+                                    };
+                                    dictString := dictString^ ++ "}";
+                                    dictString^;
+                                  }
                           />
                         </div>
                       </div>
                     })
+                 |> Array.of_list
                  |> React.array;
                }
+             )
+           | DNS(dns) =>
+             Models.Test.(
+               <div>
+                 <DataField labelName="Record" value={dns.record} />
+                 <DataField labelName="Strategy" value={dns.strategy} />
+                 <DataField
+                   labelName="Check"
+                   value={List.nth(dns.check, 0)}
+                 />
+               </div>
+             )
+           | SSH(ssh) =>
+             Models.Test.(
+               <div>
+                 <DataField labelName="Port" value={ssh.port} />
+                 <DataField labelName="Username" value={ssh.username} />
+                 <DataField
+                   labelName="Credential type"
+                   value={ssh.credentialType}
+                 />
+               </div>
              )
            | Empty => <DataField labelName="None" value="-" />
            }}

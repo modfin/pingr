@@ -60,7 +60,7 @@ let make =
                 value=key
                 placeholder=keyPlaceholder
                 onChange={e =>
-                  Form.List(
+                  Form.TupleList(
                     setPair(
                       i,
                       pairs,
@@ -86,7 +86,7 @@ let make =
                 value
                 placeholder=valuePlaceholder
                 onChange={e =>
-                  Form.List(
+                  Form.TupleList(
                     setPair(
                       i,
                       pairs,
@@ -101,7 +101,9 @@ let make =
             <div className="w-1/12 px-3">
               <button
                 type_="button"
-                onClick={_e => Form.List(removePair(i, pairs)) |> onChange}
+                onClick={_e =>
+                  Form.TupleList(removePair(i, pairs)) |> onChange
+                }
                 className="self-center bg-red-500 hover:bg-red-700 text-white py-1 px-2 rounded w-8 h-8">
                 {"-" |> React.string}
               </button>
@@ -112,7 +114,7 @@ let make =
      |> React.array}
     <button
       type_="button"
-      onClick={_e => Form.List(addPair(pairs)) |> onChange}
+      onClick={_e => Form.TupleList(addPair(pairs)) |> onChange}
       className="bg-green-500 hover:bg-green-700 text-white py-1 px-2 rounded w-8 h-8">
       {"+" |> React.string}
     </button>

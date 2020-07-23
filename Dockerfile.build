@@ -25,7 +25,7 @@ RUN cd /go/src/pingr && go build -o /pingrd ./cmd/pingrd/pingrd.go
 
 # copy the binary to a clean alpine image
 FROM alpine
-RUN apk add --no-cache tzdata ca-certificates
+RUN apk add --no-cache tzdata ca-certificates iputils
 COPY --from=builder /pingrd /
 EXPOSE 8080
 CMD /pingrd

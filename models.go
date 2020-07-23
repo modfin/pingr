@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/jmoiron/sqlx/types"
 	"pingr/internal/bus"
+	"pingr/internal/platform/dns"
 	"pingr/internal/poll"
 	"pingr/internal/push"
 	"time"
@@ -214,20 +215,25 @@ func (j BaseTest) Validate() bool {
 
 type SSHTest struct {
 	Blob struct {
-		Username   string `json:"username"`
-		Password   string `json:"password"`
-		Port       string `json:"port"`
-		UseKeyPair bool   `json:"use_key_pair"`
+		CredentialType string `json:"credential_type"`
+		Credential     string `json:"credential"`
+		Port           string `json:"port"`
+		Username       string `json:"username"`
 	} `json:"blob"`
 	BaseTest
 }
 
 func (t SSHTest) RunTest(*bus.Bus) (time.Duration, error) {
-	return poll.SSH(t.Url, t.Blob.Port, t.Timeout, t.Blob.Username, t.Blob.Password, t.Blob.UseKeyPair)
+	return poll.SSH(t.Url, t.Blob.Port, t.Timeout, t.Blob.Username, t.Blob.CredentialType, t.Blob.Credential)
 }
 
 func (t SSHTest) Validate() bool {
 	if !t.BaseTest.Validate() {
+		return false
+	}
+	switch t.Blob.CredentialType {
+	case "userpass", "key":
+	default:
 		return false
 	}
 	if t.Blob.Username == "" {
@@ -236,7 +242,7 @@ func (t SSHTest) Validate() bool {
 	if t.Blob.Port == "" {
 		return false
 	}
-	if !t.Blob.UseKeyPair && t.Blob.Password == "" {
+	if t.Blob.Credential == "" {
 		return false //Maybe some ssh servers won't require password but I guess most do
 	}
 	return true
@@ -333,23 +339,23 @@ func (t HTTPTest) Validate() bool {
 
 type DNSTest struct {
 	Blob struct {
-		IpAddr string   `json:"ip_addr"`
-		CNAME  string   `json:"cname"`
-		TXT    []string `json:"txt"`
+		Record   poll.Record   `json:"record"`
+		Strategy poll.Strategy `json:"strategy"`
+		Check    []string      `json:"check"`
 	} `json:"blob"`
 
 	BaseTest
 }
 
 func (t DNSTest) RunTest(*bus.Bus) (time.Duration, error) {
-	return 0, nil //TODO fix poll.DNS(t.Url, t.Timeout*time.Second, t.Blob.IpAddr, t.Blob.CNAME, t.Blob.TXT)
+	return poll.DNS(dns.Get(), t.Url, t.Timeout*time.Second, t.Blob.Record, t.Blob.Strategy, t.Blob.Check)
 }
 
 func (t DNSTest) Validate() bool {
 	if !t.BaseTest.Validate() {
 		return false
 	}
-	if len(t.Blob.TXT) == 0 && t.Blob.CNAME == "" && t.Blob.IpAddr == "" { // Has to test something
+	if t.Blob.Record == "" && t.Blob.Strategy == "" && len(t.Blob.Check) == 0 { // Has to test something
 		return false
 	}
 	return true
@@ -431,4 +437,13 @@ func (t PrometheusPushTest) Validate() bool {
 		}
 	}
 	return true
+}
+
+func (t GenericTest) SensitiveTest() bool {
+	switch t.TestType {
+	case "SSH":
+		return true
+	default:
+		return false
+	}
 }

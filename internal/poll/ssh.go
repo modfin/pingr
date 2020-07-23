@@ -1,39 +1,48 @@
 package poll
 
 import (
+	"errors"
 	"fmt"
 	"golang.org/x/crypto/ssh"
-	"io/ioutil"
+	"pingr/internal/sec"
 	"time"
 )
 
-/*
-TODO: Add support for both PublicKey validation with or without password
-TODO: Add support for username and password without and Keys
-TODO: How to read private keys?
-*/
-func SSH(hostname string, port string, timeOut time.Duration, username string, password string, useKeyPair bool) (time.Duration, error) {
-	var authMethod ssh.AuthMethod
 
-	if useKeyPair {
-		// Somehow read a key pair
-		var key []byte
-		key, err := ioutil.ReadFile("id_ed25519")
+func SSH(hostname string, port string, timeOut time.Duration, username string, credentialType string, credential string) (time.Duration, error) {
+	var authMethod ssh.AuthMethod
+	
+	switch(credentialType) {
+	case "key":
+		key := sec.SSHKey{
+			Ciphertext: credential,
+		}
+		err := key.Open()
 		if err != nil {
-			return 0, err
+			return 0, errors.New("could not open ssh key: " + err.Error())
 		}
-		var signer ssh.Signer
-		if password != "" {
-			signer, err = ssh.ParsePrivateKeyWithPassphrase(key, []byte(password))
-		} else {
-			signer, err = ssh.ParsePrivateKey(key)
-		}
-		if err != nil {
-			return 0, err
-		}
+		signer, err := ssh.ParsePrivateKey([]byte(key.PEM))
 		authMethod = ssh.PublicKeys(signer)
-	} else {
-		authMethod = ssh.Password(password)
+		err = key.Seal()
+		if err != nil {
+			return 0, errors.New("could not seal ssh key: " + err.Error())
+		}
+	case "userpass":
+		user := sec.User{
+			Ciphertext: credential,
+		}
+		err := user.Open()
+		if err != nil {
+			return 0, errors.New("could not open password: " + err.Error())
+		}
+		authMethod = ssh.Password(user.Password)
+		err = user.Seal()
+		if err != nil {
+			return 0, errors.New("could not seal password: " + err.Error())
+		}
+
+	default:
+		return 0, fmt.Errorf("invalid ssh credential type %s", credentialType)
 	}
 
 	config := &ssh.ClientConfig{
@@ -41,7 +50,7 @@ func SSH(hostname string, port string, timeOut time.Duration, username string, p
 		Auth:              []ssh.AuthMethod{
 			authMethod,
 		},
-		Timeout: timeOut,
+		Timeout: timeOut*time.Second,
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // TODO: Add public key check
 	}
 

@@ -59,7 +59,7 @@ let make = () => {
     [|state|],
   );
   <>
-    <div className="relative bg-gray-400 my-4 p-1">
+    <div className="relative bg-gray-400 my-4 p-1 px-4">
       <p className="text-xl font-bold ml-1"> {"Contacts" |> React.string} </p>
       <button
         onClick={_event => Paths.goToNewContact()}
@@ -69,7 +69,7 @@ let make = () => {
     </div>
     {switch (state) {
      | Loading => <div> {ReasonReact.string("Loading...")} </div>
-     | Failed(msg) => <div> {ReasonReact.string(msg)} </div>
+     | Failed(msg) => <div className="px-4"> {ReasonReact.string(msg)} </div>
      | Success(contacts) =>
        <>
          <table className="table-auto text-left mx-2">

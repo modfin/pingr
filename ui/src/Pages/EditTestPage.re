@@ -62,7 +62,6 @@ let make = (~id) => {
     );
     None;
   });
-  Js.log(state);
   switch (state) {
   | {test: Loading, testContacts: _} =>
     <div> {ReasonReact.string("Loading...")} </div>
@@ -77,12 +76,76 @@ let make = (~id) => {
           {"Edit test" |> React.string}
         </p>
       </div>
-      <TestForm
-        submitTest=Api.putTest
-        submitContacts=Api.putTestContacts
-        inputTest=test
-        inputTestContacts=testContacts
-      />
+      <div className="px-4 pt-4 lg:w-1/2">
+        {switch (test.testType) {
+         | "HTTP" =>
+           <HTTPForm
+             inputTest=test
+             inputTestContacts=testContacts
+             submitTest=Api.putTest
+             submitContacts=Api.putTestContacts
+           />
+         | "Ping" =>
+           <PingForm
+             inputTest=test
+             inputTestContacts=testContacts
+             submitTest=Api.putTest
+             submitContacts=Api.putTestContacts
+           />
+         | "TCP" =>
+           <PortTestForm
+             testType="TCP"
+             inputTest=test
+             inputTestContacts=testContacts
+             submitTest=Api.putTest
+             submitContacts=Api.putTestContacts
+           />
+         | "TLS" =>
+           <PortTestForm
+             testType="TLS"
+             inputTest=test
+             inputTestContacts=testContacts
+             submitTest=Api.putTest
+             submitContacts=Api.putTestContacts
+           />
+         | "Prometheus" =>
+           <PrometheusForm
+             inputTest=test
+             inputTestContacts=testContacts
+             submitTest=Api.putTest
+             submitContacts=Api.putTestContacts
+           />
+         | "DNS" =>
+           <DNSForm
+             inputTest=test
+             inputTestContacts=testContacts
+             submitTest=Api.putTest
+             submitContacts=Api.putTestContacts
+           />
+         | "SSH" =>
+           <SSHForm
+             inputTest=test
+             inputTestContacts=testContacts
+             submitTest=Api.putTest
+             submitContacts=Api.putTestContacts
+           />
+         | "HTTPPush" =>
+           <HTTPPushForm
+             inputTest=test
+             inputTestContacts=testContacts
+             submitTest=Api.putTest
+             submitContacts=Api.putTestContacts
+           />
+         | "PrometheusPush" =>
+           <PrometheusPushForm
+             inputTest=test
+             inputTestContacts=testContacts
+             submitTest=Api.postTest
+             submitContacts=Api.postTestContacts
+           />
+         | _ => "invalid test type" |> React.string
+         }}
+      </div>
     </>
   | {test: Success(test), _} =>
     <>
@@ -91,11 +154,67 @@ let make = (~id) => {
           {"Edit test" |> React.string}
         </p>
       </div>
-      <TestForm
-        submitTest=Api.putTest
-        submitContacts=Api.putTestContacts
-        inputTest=test
-      />
+      <div className="px-4 pt-4 lg:w-1/2">
+        {switch (test.testType) {
+         | "HTTP" =>
+           <HTTPForm
+             inputTest=test
+             submitTest=Api.putTest
+             submitContacts=Api.putTestContacts
+           />
+         | "Ping" =>
+           <PingForm
+             inputTest=test
+             submitTest=Api.putTest
+             submitContacts=Api.putTestContacts
+           />
+         | "TCP" =>
+           <PortTestForm
+             testType="TCP"
+             inputTest=test
+             submitTest=Api.putTest
+             submitContacts=Api.putTestContacts
+           />
+         | "TLS" =>
+           <PortTestForm
+             testType="TLS"
+             inputTest=test
+             submitTest=Api.putTest
+             submitContacts=Api.putTestContacts
+           />
+         | "Prometheus" =>
+           <PrometheusForm
+             inputTest=test
+             submitTest=Api.putTest
+             submitContacts=Api.putTestContacts
+           />
+         | "DNS" =>
+           <DNSForm
+             inputTest=test
+             submitTest=Api.putTest
+             submitContacts=Api.putTestContacts
+           />
+         | "SSH" =>
+           <SSHForm
+             inputTest=test
+             submitTest=Api.putTest
+             submitContacts=Api.putTestContacts
+           />
+         | "HTTPPush" =>
+           <HTTPPushForm
+             inputTest=test
+             submitTest=Api.putTest
+             submitContacts=Api.putTestContacts
+           />
+         | "PrometheusPush" =>
+           <PrometheusPushForm
+             inputTest=test
+             submitTest=Api.postTest
+             submitContacts=Api.postTestContacts
+           />
+         | _ => "invalid test type" |> React.string
+         }}
+      </div>
     </>
   };
 };

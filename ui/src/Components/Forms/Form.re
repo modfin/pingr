@@ -2,7 +2,9 @@ type t =
   | Str(string)
   | Float(float)
   | Int(int)
-  | List(list((string, string)));
+  | List(list(string))
+  | TupleList(list((string, string)))
+  | PromMetrics(list(Models.Test.promMetric));
 
 type validation('a) =
   | NotEmpty
@@ -14,6 +16,19 @@ let validate = (rule, value, values) =>
   | (NotEmpty, Int(i)) => i > 0
   | (NotEmpty, Float(f)) => f > 0.
   | (NotEmpty, List(l)) => List.length(l) > 0
+  | (NotEmpty, TupleList(l)) => List.length(l) > 0
+  | (NotEmpty, PromMetrics(p)) =>
+    Models.Test.(
+      switch (
+        p
+        |> List.find(metric =>
+             metric.key == "" || metric.lowerBound > metric.upperBound
+           )
+      ) {
+      | exception Not_found => true
+      | _metric => false
+      }
+    )
   | (Custom(fn), _) => fn(value, values)
   };
 

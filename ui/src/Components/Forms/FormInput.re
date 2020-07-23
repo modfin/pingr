@@ -1,5 +1,6 @@
 type inputTypes =
   | Text
+  | Password
   | Number;
 
 type width =
@@ -32,6 +33,7 @@ let make =
     <input
       value={
         switch (type_) {
+        | Password
         | Text =>
           switch (value) {
           | Form.Str(s) => s
@@ -47,6 +49,7 @@ let make =
       onChange={e =>
         (
           switch (type_) {
+          | Password
           | Text => Form.Str(ReactEvent.Form.target(e)##value)
           | Number =>
             try(Form.Int(int_of_string(ReactEvent.Form.target(e)##value))) {
@@ -59,6 +62,7 @@ let make =
       className="appearance-none block w-full bg-gray-200 text-gray-700 border border-gray-400 rounded py-3 px-4 leading-tight focus:outline-none focus:bg-white"
       type_={
         switch (type_) {
+        | Password => "password"
         | Text => "text"
         | Number => "number"
         }

@@ -14,7 +14,7 @@ let make = (~label, ~placeholder, ~value, ~onChange, ~errorMsg, ~infoText) => {
       }
       onChange={e => Form.Str(ReactEvent.Form.target(e)##value) |> onChange}
       placeholder
-      className="resize-y appearance-none block w-full bg-gray-200 text-gray-700 border border-gray-400 rounded py-3 px-4 leading-tight focus:outline-none focus:bg-white"
+      className="h-64 resize-y appearance-none block w-full bg-gray-200 text-gray-700 border border-gray-400 rounded py-3 px-4 leading-tight focus:outline-none focus:bg-white"
     />
     {errorMsg != React.null
        ? <p className="text-red-500 text-xs italic"> errorMsg </p>

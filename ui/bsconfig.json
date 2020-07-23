@@ -7,6 +7,11 @@
     "dir" : "src",
     "subdirs" : true
   },
+  "bs-dependencies": [
+    "reason-react",
+    "@glennsl/bs-json",
+    "bs-fetch"
+  ],
   "bsc-flags": ["-bs-super-errors", "-bs-no-version-header"],
   "package-specs": [{
     "module": "commonjs",
@@ -14,10 +19,6 @@
   }],
   "suffix": ".bs.js",
   "namespace": true,
-  "bs-dependencies": [
-    "reason-react",
-    "@glennsl/bs-json",
-    "bs-fetch"
-  ],
+
   "refmt": 3
 }

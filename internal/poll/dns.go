@@ -8,20 +8,6 @@ import (
 	"time"
 )
 
-/*
-	Check the CNAME matches a certain name
-		LookupCNAME
-	Check that the Addr matches one of a one/many address
-		LookupHost or LookupIpAddr??
-	Check that the TXT contains a particular value
-		LookupTXT, Many records for the same name? What should happen?
-
-	DNSServer addr port always 53???
-		Should the network always be udp?
-
-	In TXT:
-		Should all "TXT's" contain the value?
-*/
 const (
 	_port = "53"
 )
@@ -76,8 +62,6 @@ const (
 	Exact Strategy = "exact"
 )
 
-// mfn.se
-//
 func DNS(resolvers []string, domain string, timeout time.Duration, record Record, strategy Strategy, check []string) (time.Duration, error) {
 	start := time.Now()
 

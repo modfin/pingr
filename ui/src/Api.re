@@ -1,4 +1,4 @@
-type response =
+type responseJson =
   | Success(string)
   | SuccessJSON(Js.Json.t)
   | Error(string);
@@ -58,7 +58,7 @@ module JsonTransport = {
   };
 };
 
-let p = "http://localhost:8080/api";
+let p = "/api";
 
 let fetchJson = (url, decoder) =>
   Js.Promise.(

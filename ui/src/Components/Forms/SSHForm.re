@@ -1,4 +1,4 @@
-type httpFormTypes =
+type sshFormTypes =
   /* Poll tests */
   | TestName
   | Interval
@@ -6,15 +6,14 @@ type httpFormTypes =
   | Url
   /* Contacts */
   | Contacts
-  /* Http tests */
-  | ReqMethod
-  | ReqHeaders
-  | ReqBody
-  | ResStatus
-  | ResHeaders
-  | ResBody;
+  /* SSH */
+  | Username
+  | Port
+  | CredentialType
+  | Password
+  | Key;
 
-type httpFormState = {
+type sshFormState = {
   /* Poll tests */
   mutable testName: Form.t,
   mutable interval: Form.t,
@@ -22,13 +21,12 @@ type httpFormState = {
   mutable url: Form.t,
   /* Contacts */
   mutable contacts: Form.t,
-  /* Http tests */
-  mutable reqMethod: Form.t,
-  mutable reqHeaders: Form.t,
-  mutable reqBody: Form.t,
-  mutable resStatus: Form.t,
-  mutable resHeaders: Form.t,
-  mutable resBody: Form.t,
+  /* SSH */
+  mutable port: Form.t,
+  mutable credentialType: Form.t,
+  mutable username: Form.t,
+  mutable password: Form.t,
+  mutable key: Form.t,
 };
 
 let getInitialFormState = () => {
@@ -37,17 +35,16 @@ let getInitialFormState = () => {
   timeout: Int(0),
   url: Str(""),
   contacts: TupleList([]),
-  reqMethod: Str(""),
-  reqHeaders: TupleList([]),
-  reqBody: Str(""),
-  resStatus: Int(0),
-  resHeaders: TupleList([]),
-  resBody: Str(""),
+  port: Str(""),
+  credentialType: Str(""),
+  username: TupleList([]),
+  password: TupleList([]),
+  key: TupleList([]),
 };
 
-module HttpFormConfig = {
-  type field = httpFormTypes;
-  type state = httpFormState;
+module SSHFormConfig = {
+  type field = sshFormTypes;
+  type state = sshFormState;
   let update = (field, value, state) => {
     switch (field, value) {
     | (TestName, v) => {...state, testName: v}
@@ -55,12 +52,11 @@ module HttpFormConfig = {
     | (Timeout, v) => {...state, timeout: v}
     | (Url, v) => {...state, url: v}
     | (Contacts, v) => {...state, contacts: v}
-    | (ReqMethod, v) => {...state, reqMethod: v}
-    | (ReqHeaders, v) => {...state, reqHeaders: v}
-    | (ReqBody, v) => {...state, reqBody: v}
-    | (ResStatus, v) => {...state, resStatus: v}
-    | (ResHeaders, v) => {...state, resHeaders: v}
-    | (ResBody, v) => {...state, resBody: v}
+    | (Port, v) => {...state, port: v}
+    | (CredentialType, v) => {...state, credentialType: v}
+    | (Username, v) => {...state, username: v}
+    | (Password, v) => {...state, password: v}
+    | (Key, v) => {...state, key: v}
     };
   };
   let get = (field, state) => {
@@ -70,18 +66,30 @@ module HttpFormConfig = {
     | Timeout => state.timeout
     | Url => state.url
     | Contacts => state.contacts
-    | ReqMethod => state.reqMethod
-    | ReqHeaders => state.reqHeaders
-    | ReqBody => state.reqBody
-    | ResStatus => state.resStatus
-    | ResHeaders => state.resHeaders
-    | ResBody => state.resBody
+    | Port => state.port
+    | CredentialType => state.credentialType
+    | Username => state.username
+    | Password => state.password
+    | Key => state.key
     };
   };
 };
 
-module HttpForm = Form.FormComponent(HttpFormConfig);
-let keyMsg = "Fill keys and values or remove unused once";
+module SSHForm = Form.FormComponent(SSHFormConfig);
+
+let pswValidation = (value, values) => {
+  switch (values.credentialType) {
+  | Str("userpass") => value != Form.Str("")
+  | _ => true
+  };
+};
+
+let keyValidation = (value, values) => {
+  switch (values.credentialType) {
+  | Str("key") => value != Form.Str("")
+  | _ => true
+  };
+};
 
 let rules = [
   (TestName, [(Form.NotEmpty, FormHelpers.emptyMsg)]),
@@ -97,27 +105,21 @@ let rules = [
       ),
     ],
   ),
-  (ReqMethod, [(Form.NotEmpty, FormHelpers.emptyMsg)]),
-  (ReqHeaders, [(Form.Custom(FormHelpers.keyPairValidation), keyMsg)]),
-  (ResHeaders, [(Form.Custom(FormHelpers.keyPairValidation), keyMsg)]),
-];
-
-let httpMethods = [
-  ("GET", "GET"),
-  ("POST", "POST"),
-  ("PUT", "PUT"),
-  ("HEAD", "HEAD"),
-  ("DELETE", "DELETE"),
+  (Port, [(Form.NotEmpty, FormHelpers.aboveZero)]),
+  (CredentialType, [(Form.NotEmpty, FormHelpers.emptyMsg)]),
+  (Username, [(Form.NotEmpty, FormHelpers.emptyMsg)]),
+  (Password, [(Form.Custom(pswValidation), FormHelpers.emptyMsg)]),
+  (Key, [(Form.Custom(keyValidation), FormHelpers.emptyMsg)]),
 ];
 
 let getTestPayload = (~inputTest=?, values) => {
-  let testPayload = Js.Dict.empty();
+  let payload = Js.Dict.empty();
   switch (inputTest) {
   | Some(test) =>
     Models.Test.(
       switch (test) {
       | Some(test_) =>
-        FormHelpers.setJsonKey(testPayload, "test_id", Str(test_.testId))
+        FormHelpers.setJsonKey(payload, "test_id", Str(test_.testId))
       | None => ()
       }
     )
@@ -125,31 +127,28 @@ let getTestPayload = (~inputTest=?, values) => {
   | None => ()
   };
 
-  FormHelpers.setJsonKey(testPayload, "test_type", Str("HTTP"));
-  FormHelpers.setJsonKey(testPayload, "test_name", values.testName);
-  FormHelpers.setJsonKey(testPayload, "timeout", values.timeout);
-  FormHelpers.setJsonKey(testPayload, "url", values.url);
-  FormHelpers.setJsonKey(testPayload, "interval", values.interval);
+  FormHelpers.setJsonKey(payload, "test_type", Str("SSH"));
+  FormHelpers.setJsonKey(payload, "test_name", values.testName);
+  FormHelpers.setJsonKey(payload, "timeout", values.timeout);
+  FormHelpers.setJsonKey(payload, "url", values.url);
+  FormHelpers.setJsonKey(payload, "interval", values.interval);
 
   let blob = Js.Dict.empty();
-  FormHelpers.setJsonKey(blob, "req_method", values.reqMethod);
-  Js.log(values.reqHeaders);
-  if (values.reqHeaders == TupleList([])) {
-    Js.Dict.set(blob, "req_headers", Js.Json.object_(Js.Dict.empty()));
-  } else {
-    FormHelpers.setJsonKey(blob, "req_headers", values.reqHeaders);
-  };
-  FormHelpers.setJsonKey(blob, "req_body", values.reqBody);
-  FormHelpers.setJsonKey(blob, "res_status", values.resStatus);
-  if (values.resHeaders == TupleList([])) {
-    Js.Dict.set(blob, "res_headers", Js.Json.object_(Js.Dict.empty()));
-  } else {
-    FormHelpers.setJsonKey(blob, "res_headers", values.resHeaders);
-  };
-  FormHelpers.setJsonKey(blob, "res_body", values.resBody);
-  Js.Dict.set(testPayload, "blob", Js.Json.object_(blob));
+  FormHelpers.setJsonKey(blob, "username", values.username);
+  FormHelpers.setJsonKey(blob, "port", values.port);
+  FormHelpers.setJsonKey(blob, "credential_type", values.credentialType);
+  FormHelpers.setJsonKey(
+    blob,
+    "credential",
+    switch (values.credentialType) {
+    | Str("key") => values.key
+    | Str("userpass") => values.password
+    | _ => Str(".")
+    },
+  );
+  Js.Dict.set(payload, "blob", Js.Json.object_(blob));
 
-  testPayload;
+  payload;
 };
 
 [@react.component]
@@ -215,49 +214,22 @@ let make =
       Api.tryTest(payload, tryTestCallback);
     };
   };
-
-  <HttpForm
+  <SSHForm
+    rules
     initialState={
                    let init = getInitialFormState();
                    switch (inputTest) {
                    | None => ()
-                   | Some(httpTest) =>
-                     init.testName = Str(httpTest.testName);
-                     init.interval = Int(httpTest.interval);
-                     init.timeout = Int(httpTest.timeout);
-                     init.url = Str(httpTest.url);
-                     switch (httpTest.specific) {
-                     | HTTP(http) =>
-                       init.reqMethod = Str(http.reqMethod);
-                       switch (http.reqHeaders) {
-                       | None => ()
-                       | Some(headers) =>
-                         init.reqHeaders =
-                           TupleList(
-                             Js.Dict.entries(headers) |> Array.to_list,
-                           )
-                       };
-                       switch (http.reqBody) {
-                       | None => ()
-                       | Some(body) => init.reqBody = Str(body)
-                       };
-                       switch (http.resStatus) {
-                       | None => ()
-                       | Some(status) => init.resStatus = Int(status)
-                       };
-                       switch (http.resHeaders) {
-                       | None => ()
-                       | Some(headers) =>
-                         init.resHeaders =
-                           TupleList(
-                             Js.Dict.entries(headers) |> Array.to_list,
-                           )
-                       };
-                       switch (http.resBody) {
-                       | None => ()
-                       | Some(body) => init.resBody = Str(body)
-                       };
-                     | _ => () /* Should only be http test*/
+                   | Some(test) =>
+                     init.testName = Str(test.testName);
+                     init.interval = Int(test.interval);
+                     init.timeout = Int(test.timeout);
+                     init.url = Str(test.url);
+                     switch (test.specific) {
+                     | SSH(ssh) =>
+                       init.port = Str(ssh.port);
+                       init.credentialType = Str(ssh.credentialType);
+                     | _ => ()
                      };
                    };
                    switch (inputTestContacts) {
@@ -276,8 +248,7 @@ let make =
                    };
                    init;
                  }
-    rules
-    render={(f: HttpForm.form) =>
+    render={(f: SSHForm.form) =>
       <form
         onSubmit={e => handleSubmit(e, f.form.values, f.form.errors)}
         className="w-full">
@@ -326,107 +297,95 @@ let make =
           <FormInput
             type_=Text
             width=Full
-            label="Url"
-            infoText="Url that test will poll against (*)"
+            label="Hostname"
+            infoText="Hostname of SSH server (*)"
             errorMsg={
               submitted
                 ? FormHelpers.getError(Url, f.form.errors) : React.null
             }
-            placeholder="https://google.com"
+            placeholder="google.com"
             value={f.form.values.url}
             onChange={v => v |> f.handleChange(Url)}
           />
         </div>
         <div className="flex flex-wrap -mx-3 mb-6">
-          <FormSelect
-            width=Half
-            label="http method"
-            placeholder="Choose HTTP method"
-            infoText="HTTP method (*)"
-            errorMsg={
-              submitted
-                ? FormHelpers.getError(ReqMethod, f.form.errors) : React.null
-            }
-            options=httpMethods
-            value={f.form.values.reqMethod}
-            onChange={v => v |> f.handleChange(ReqMethod)}
-          />
           <FormInput
-            type_=Number
-            width=Half
-            label="Accepted response code"
-            infoText="Expected response HTTP status code"
+            type_=Text
+            width=Full
+            label="Port"
+            infoText="Port of SSH server (*)"
             errorMsg={
               submitted
-                ? FormHelpers.getError(ResStatus, f.form.errors) : React.null
+                ? FormHelpers.getError(Port, f.form.errors) : React.null
             }
-            value={f.form.values.resStatus}
-            onChange={v => v |> f.handleChange(ResStatus)}
+            placeholder="22"
+            value={f.form.values.port}
+            onChange={v => v |> f.handleChange(Port)}
           />
         </div>
         <div className="flex flex-wrap -mx-3 mb-6">
-          <FormKeyValue
-            pairs={
-              switch (f.form.values.reqHeaders) {
-              | TupleList(l) => l
-              | _ => []
-              }
-            }
-            label="request headers"
-            infoText="Values for the request header"
-            keyPlaceholder="Content-Type"
-            valuePlaceholder="application/json"
+          <FormInput
+            type_=Text
+            width=Full
+            label="Username"
+            infoText="Username used for authentication (*)"
             errorMsg={
               submitted
-                ? FormHelpers.getError(ReqHeaders, f.form.errors) : React.null
+                ? FormHelpers.getError(Username, f.form.errors) : React.null
             }
-            onChange={v => v |> f.handleChange(ReqHeaders)}
+            value={f.form.values.username}
+            onChange={v => v |> f.handleChange(Username)}
           />
         </div>
         <div className="flex flex-wrap -mx-3 mb-6">
-          <FormTextarea
-            label="Request body"
-            placeholder="{ token: 1234-abcd, ...}"
-            infoText="Body of the request"
+          <FormSelect
+            width=Full
+            label="Credential type"
+            placeholder="Choose authentication method"
+            infoText="Method which authentication will be made (*)"
             errorMsg={
               submitted
-                ? FormHelpers.getError(ReqBody, f.form.errors) : React.null
+                ? FormHelpers.getError(CredentialType, f.form.errors)
+                : React.null
             }
-            value={f.form.values.reqBody}
-            onChange={v => v |> f.handleChange(ReqBody)}
+            options=[
+              ("Username and password", "userpass"),
+              ("Private key", "key"),
+            ]
+            onChange={v => v |> f.handleChange(CredentialType)}
+            value={f.form.values.credentialType}
           />
         </div>
         <div className="flex flex-wrap -mx-3 mb-6">
-          <FormKeyValue
-            pairs={
-              switch (f.form.values.resHeaders) {
-              | TupleList(l) => l
-              | _ => []
-              }
-            }
-            label="response headers"
-            infoText="Values that are expected in the response header"
-            keyPlaceholder="Content-Type"
-            valuePlaceholder="application/json"
-            errorMsg={
-              submitted
-                ? FormHelpers.getError(ResHeaders, f.form.errors) : React.null
-            }
-            onChange={v => v |> f.handleChange(ResHeaders)}
-          />
-        </div>
-        <div className="flex flex-wrap -mx-3 mb-6">
-          <FormTextarea
-            label="Expected response body"
-            placeholder="pong"
-            infoText="Expected response body"
-            errorMsg={
-              submitted
-                ? FormHelpers.getError(ResBody, f.form.errors) : React.null
-            }
-            value={f.form.values.resBody}
-            onChange={v => v |> f.handleChange(ResBody)}
-          />
+          {switch (f.form.values.credentialType) {
+           | Str("key") =>
+             <FormTextarea
+               label="Key"
+               placeholder="-----BEGIN OPENSSH PRIVATE KEY-----......."
+               value={f.form.values.key}
+               onChange={v => v |> f.handleChange(Key)}
+               errorMsg={
+                 submitted
+                   ? FormHelpers.getError(Key, f.form.errors) : React.null
+               }
+               infoText="Key which will be used to autheticate (*)"
+             />
+           | Str("userpass") =>
+             <FormInput
+               type_=Password
+               width=Full
+               label="Password"
+               infoText="Password used for authentication (*)"
+               errorMsg={
+                 submitted
+                   ? FormHelpers.getError(Password, f.form.errors)
+                   : React.null
+               }
+               value={f.form.values.password}
+               onChange={v => v |> f.handleChange(Password)}
+             />
+           | _ => React.null
+           }}
         </div>
         <FormTestContacts
           errorMsg={

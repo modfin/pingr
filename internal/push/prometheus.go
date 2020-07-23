@@ -41,7 +41,7 @@ func Prometheus(testId string, body []byte, metricTests []MetricTest) error {
 	for _, metricTest := range metricTests {
 		keyMetricFamily, ok := metricFamilies[metricTest.Key]
 		if !ok {
-			return errors.New("invalid prometheus key")
+			return fmt.Errorf("invalid prometheus key: %s", metricTest.Key)
 		}
 		for _, keyMetric := range keyMetricFamily.Metric {
 			labelCount := 0
@@ -52,7 +52,7 @@ func Prometheus(testId string, body []byte, metricTests []MetricTest) error {
 				}
 			}
 			if labelCount != len(metricTest.Labels) {
-				continue
+				return fmt.Errorf("no mathing labels for prometheus key: %s with labels: %v", metricTest.Key, metricTest.Labels)
 			}
 
 			switch keyMetricFamily.Type.String() {

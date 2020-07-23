@@ -1,4 +1,4 @@
-type httpFormTypes =
+type dnsFormTypes =
   /* Poll tests */
   | TestName
   | Interval
@@ -6,15 +6,12 @@ type httpFormTypes =
   | Url
   /* Contacts */
   | Contacts
-  /* Http tests */
-  | ReqMethod
-  | ReqHeaders
-  | ReqBody
-  | ResStatus
-  | ResHeaders
-  | ResBody;
+  /* DNS */
+  | Record
+  | Strategy
+  | Check;
 
-type httpFormState = {
+type dnsFormState = {
   /* Poll tests */
   mutable testName: Form.t,
   mutable interval: Form.t,
@@ -22,13 +19,10 @@ type httpFormState = {
   mutable url: Form.t,
   /* Contacts */
   mutable contacts: Form.t,
-  /* Http tests */
-  mutable reqMethod: Form.t,
-  mutable reqHeaders: Form.t,
-  mutable reqBody: Form.t,
-  mutable resStatus: Form.t,
-  mutable resHeaders: Form.t,
-  mutable resBody: Form.t,
+  /* DNS */
+  mutable record: Form.t,
+  mutable strategy: Form.t,
+  mutable check: Form.t,
 };
 
 let getInitialFormState = () => {
@@ -37,17 +31,14 @@ let getInitialFormState = () => {
   timeout: Int(0),
   url: Str(""),
   contacts: TupleList([]),
-  reqMethod: Str(""),
-  reqHeaders: TupleList([]),
-  reqBody: Str(""),
-  resStatus: Int(0),
-  resHeaders: TupleList([]),
-  resBody: Str(""),
+  record: Str(""),
+  strategy: Str(""),
+  check: List([""]),
 };
 
-module HttpFormConfig = {
-  type field = httpFormTypes;
-  type state = httpFormState;
+module DNSFormConfig = {
+  type field = dnsFormTypes;
+  type state = dnsFormState;
   let update = (field, value, state) => {
     switch (field, value) {
     | (TestName, v) => {...state, testName: v}
@@ -55,12 +46,9 @@ module HttpFormConfig = {
     | (Timeout, v) => {...state, timeout: v}
     | (Url, v) => {...state, url: v}
     | (Contacts, v) => {...state, contacts: v}
-    | (ReqMethod, v) => {...state, reqMethod: v}
-    | (ReqHeaders, v) => {...state, reqHeaders: v}
-    | (ReqBody, v) => {...state, reqBody: v}
-    | (ResStatus, v) => {...state, resStatus: v}
-    | (ResHeaders, v) => {...state, resHeaders: v}
-    | (ResBody, v) => {...state, resBody: v}
+    | (Record, v) => {...state, record: v}
+    | (Strategy, v) => {...state, strategy: v}
+    | (Check, v) => {...state, check: v}
     };
   };
   let get = (field, state) => {
@@ -70,18 +58,14 @@ module HttpFormConfig = {
     | Timeout => state.timeout
     | Url => state.url
     | Contacts => state.contacts
-    | ReqMethod => state.reqMethod
-    | ReqHeaders => state.reqHeaders
-    | ReqBody => state.reqBody
-    | ResStatus => state.resStatus
-    | ResHeaders => state.resHeaders
-    | ResBody => state.resBody
+    | Record => state.record
+    | Strategy => state.strategy
+    | Check => state.check
     };
   };
 };
 
-module HttpForm = Form.FormComponent(HttpFormConfig);
-let keyMsg = "Fill keys and values or remove unused once";
+module DNSForm = Form.FormComponent(DNSFormConfig);
 
 let rules = [
   (TestName, [(Form.NotEmpty, FormHelpers.emptyMsg)]),
@@ -97,27 +81,28 @@ let rules = [
       ),
     ],
   ),
-  (ReqMethod, [(Form.NotEmpty, FormHelpers.emptyMsg)]),
-  (ReqHeaders, [(Form.Custom(FormHelpers.keyPairValidation), keyMsg)]),
-  (ResHeaders, [(Form.Custom(FormHelpers.keyPairValidation), keyMsg)]),
-];
-
-let httpMethods = [
-  ("GET", "GET"),
-  ("POST", "POST"),
-  ("PUT", "PUT"),
-  ("HEAD", "HEAD"),
-  ("DELETE", "DELETE"),
+  (Record, [(Form.NotEmpty, FormHelpers.emptyMsg)]),
+  (Strategy, [(Form.NotEmpty, FormHelpers.emptyMsg)]),
+  (
+    Check,
+    [
+      (Form.NotEmpty, FormHelpers.emptyMsg),
+      (
+        Form.Custom(FormHelpers.listValidation),
+        "Fill all values or remove unused once",
+      ),
+    ],
+  ),
 ];
 
 let getTestPayload = (~inputTest=?, values) => {
-  let testPayload = Js.Dict.empty();
+  let payload = Js.Dict.empty();
   switch (inputTest) {
   | Some(test) =>
     Models.Test.(
       switch (test) {
       | Some(test_) =>
-        FormHelpers.setJsonKey(testPayload, "test_id", Str(test_.testId))
+        FormHelpers.setJsonKey(payload, "test_id", Str(test_.testId))
       | None => ()
       }
     )
@@ -125,31 +110,19 @@ let getTestPayload = (~inputTest=?, values) => {
   | None => ()
   };
 
-  FormHelpers.setJsonKey(testPayload, "test_type", Str("HTTP"));
-  FormHelpers.setJsonKey(testPayload, "test_name", values.testName);
-  FormHelpers.setJsonKey(testPayload, "timeout", values.timeout);
-  FormHelpers.setJsonKey(testPayload, "url", values.url);
-  FormHelpers.setJsonKey(testPayload, "interval", values.interval);
+  FormHelpers.setJsonKey(payload, "test_type", Str("DNS"));
+  FormHelpers.setJsonKey(payload, "test_name", values.testName);
+  FormHelpers.setJsonKey(payload, "timeout", values.timeout);
+  FormHelpers.setJsonKey(payload, "url", values.url);
+  FormHelpers.setJsonKey(payload, "interval", values.interval);
 
   let blob = Js.Dict.empty();
-  FormHelpers.setJsonKey(blob, "req_method", values.reqMethod);
-  Js.log(values.reqHeaders);
-  if (values.reqHeaders == TupleList([])) {
-    Js.Dict.set(blob, "req_headers", Js.Json.object_(Js.Dict.empty()));
-  } else {
-    FormHelpers.setJsonKey(blob, "req_headers", values.reqHeaders);
-  };
-  FormHelpers.setJsonKey(blob, "req_body", values.reqBody);
-  FormHelpers.setJsonKey(blob, "res_status", values.resStatus);
-  if (values.resHeaders == TupleList([])) {
-    Js.Dict.set(blob, "res_headers", Js.Json.object_(Js.Dict.empty()));
-  } else {
-    FormHelpers.setJsonKey(blob, "res_headers", values.resHeaders);
-  };
-  FormHelpers.setJsonKey(blob, "res_body", values.resBody);
-  Js.Dict.set(testPayload, "blob", Js.Json.object_(blob));
+  FormHelpers.setJsonKey(blob, "record", values.record);
+  FormHelpers.setJsonKey(blob, "strategy", values.strategy);
+  FormHelpers.setJsonKey(blob, "check", values.check);
+  Js.Dict.set(payload, "blob", Js.Json.object_(blob));
 
-  testPayload;
+  payload;
 };
 
 [@react.component]
@@ -215,49 +188,21 @@ let make =
       Api.tryTest(payload, tryTestCallback);
     };
   };
-
-  <HttpForm
+  <DNSForm
     initialState={
                    let init = getInitialFormState();
                    switch (inputTest) {
                    | None => ()
-                   | Some(httpTest) =>
-                     init.testName = Str(httpTest.testName);
-                     init.interval = Int(httpTest.interval);
-                     init.timeout = Int(httpTest.timeout);
-                     init.url = Str(httpTest.url);
-                     switch (httpTest.specific) {
-                     | HTTP(http) =>
-                       init.reqMethod = Str(http.reqMethod);
-                       switch (http.reqHeaders) {
-                       | None => ()
-                       | Some(headers) =>
-                         init.reqHeaders =
-                           TupleList(
-                             Js.Dict.entries(headers) |> Array.to_list,
-                           )
-                       };
-                       switch (http.reqBody) {
-                       | None => ()
-                       | Some(body) => init.reqBody = Str(body)
-                       };
-                       switch (http.resStatus) {
-                       | None => ()
-                       | Some(status) => init.resStatus = Int(status)
-                       };
-                       switch (http.resHeaders) {
-                       | None => ()
-                       | Some(headers) =>
-                         init.resHeaders =
-                           TupleList(
-                             Js.Dict.entries(headers) |> Array.to_list,
-                           )
-                       };
-                       switch (http.resBody) {
-                       | None => ()
-                       | Some(body) => init.resBody = Str(body)
-                       };
-                     | _ => () /* Should only be http test*/
+                   | Some(test) =>
+                     init.testName = Str(test.testName);
+                     init.interval = Int(test.interval);
+                     init.timeout = Int(test.timeout);
+                     init.url = Str(test.url);
+                     switch (test.specific) {
+                     | DNS(dns) =>
+                       init.record = Str(dns.record);
+                       init.strategy = Str(dns.strategy);
+                       init.check = List(dns.check);
                      };
                    };
                    switch (inputTestContacts) {
@@ -277,7 +222,7 @@ let make =
                    init;
                  }
     rules
-    render={(f: HttpForm.form) =>
+    render={(f: DNSForm.form) =>
       <form
         onSubmit={e => handleSubmit(e, f.form.values, f.form.errors)}
         className="w-full">
@@ -326,13 +271,13 @@ let make =
           <FormInput
             type_=Text
             width=Full
-            label="Url"
-            infoText="Url that test will poll against (*)"
+            label="Hostname"
+            infoText="Hostname which DNS will be checked (*)"
             errorMsg={
               submitted
                 ? FormHelpers.getError(Url, f.form.errors) : React.null
             }
-            placeholder="https://google.com"
+            placeholder="google.com"
             value={f.form.values.url}
             onChange={v => v |> f.handleChange(Url)}
           />
@@ -340,92 +285,58 @@ let make =
         <div className="flex flex-wrap -mx-3 mb-6">
           <FormSelect
             width=Half
-            label="http method"
-            placeholder="Choose HTTP method"
-            infoText="HTTP method (*)"
+            label="Record type"
+            placeholder="DNS record"
+            options=[
+              ("Address", "A"),
+              ("CNAME", "CNAME"),
+              ("TXT", "TXT"),
+              ("MX", "MX"),
+              ("NS", "NS"),
+            ]
+            value={f.form.values.record}
+            onChange={v => v |> f.handleChange(Record)}
+            infoText="The record type which will be checked (*)"
             errorMsg={
               submitted
-                ? FormHelpers.getError(ReqMethod, f.form.errors) : React.null
+                ? FormHelpers.getError(Record, f.form.errors) : React.null
             }
-            options=httpMethods
-            value={f.form.values.reqMethod}
-            onChange={v => v |> f.handleChange(ReqMethod)}
           />
-          <FormInput
-            type_=Number
+          <FormSelect
             width=Half
-            label="Accepted response code"
-            infoText="Expected response HTTP status code"
+            label="Check strategy"
+            placeholder="Check strategy"
+            options=[
+              ("CheckIsSubset", "check_is_subset"),
+              ("DNSIsSubset", "dns_is_subset"),
+              ("Intersects", "intersects"),
+              ("Exact", "exact"),
+            ]
+            value={f.form.values.strategy}
+            onChange={v => v |> f.handleChange(Strategy)}
+            infoText="The way in which record and DNS values will be compared (*)"
             errorMsg={
               submitted
-                ? FormHelpers.getError(ResStatus, f.form.errors) : React.null
+                ? FormHelpers.getError(Strategy, f.form.errors) : React.null
             }
-            value={f.form.values.resStatus}
-            onChange={v => v |> f.handleChange(ResStatus)}
           />
         </div>
         <div className="flex flex-wrap -mx-3 mb-6">
-          <FormKeyValue
-            pairs={
-              switch (f.form.values.reqHeaders) {
-              | TupleList(l) => l
+          <FormList
+            label="check values"
+            errorMsg={
+              submitted
+                ? FormHelpers.getError(Check, f.form.errors) : React.null
+            }
+            list={
+              switch (f.form.values.check) {
+              | List(l) => l
               | _ => []
               }
             }
-            label="request headers"
-            infoText="Values for the request header"
-            keyPlaceholder="Content-Type"
-            valuePlaceholder="application/json"
-            errorMsg={
-              submitted
-                ? FormHelpers.getError(ReqHeaders, f.form.errors) : React.null
-            }
-            onChange={v => v |> f.handleChange(ReqHeaders)}
-          />
-        </div>
-        <div className="flex flex-wrap -mx-3 mb-6">
-          <FormTextarea
-            label="Request body"
-            placeholder="{ token: 1234-abcd, ...}"
-            infoText="Body of the request"
-            errorMsg={
-              submitted
-                ? FormHelpers.getError(ReqBody, f.form.errors) : React.null
-            }
-            value={f.form.values.reqBody}
-            onChange={v => v |> f.handleChange(ReqBody)}
-          />
-        </div>
-        <div className="flex flex-wrap -mx-3 mb-6">
-          <FormKeyValue
-            pairs={
-              switch (f.form.values.resHeaders) {
-              | TupleList(l) => l
-              | _ => []
-              }
-            }
-            label="response headers"
-            infoText="Values that are expected in the response header"
-            keyPlaceholder="Content-Type"
-            valuePlaceholder="application/json"
-            errorMsg={
-              submitted
-                ? FormHelpers.getError(ResHeaders, f.form.errors) : React.null
-            }
-            onChange={v => v |> f.handleChange(ResHeaders)}
-          />
-        </div>
-        <div className="flex flex-wrap -mx-3 mb-6">
-          <FormTextarea
-            label="Expected response body"
-            placeholder="pong"
-            infoText="Expected response body"
-            errorMsg={
-              submitted
-                ? FormHelpers.getError(ResBody, f.form.errors) : React.null
-            }
-            value={f.form.values.resBody}
-            onChange={v => v |> f.handleChange(ResBody)}
+            placeholder="192.168.0.1"
+            onChange={v => v |> f.handleChange(Check)}
+            infoText="Values which will be compared with the DNS lookup (*)"
           />
         </div>
         <FormTestContacts

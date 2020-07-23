@@ -5,7 +5,9 @@ type pingFormTypes =
   | Timeout
   | Url
   /* Contacts */
-  | Contacts;
+  | Contacts
+  /* Prometheus */
+  | PromMetrics;
 
 type pingFormState = {
   /* Poll tests */
@@ -15,6 +17,12 @@ type pingFormState = {
   mutable url: Form.t,
   /* Contacts */
   mutable contacts: Form.t,
+  /* Prometheus */
+  mutable metrics: Form.t,
+};
+
+let getEmptyPromMetric = () => {
+  [Models.Test.{key: "", lowerBound: 0., upperBound: 1., labels: []}];
 };
 
 let getInitialFormState = () => {
@@ -23,9 +31,10 @@ let getInitialFormState = () => {
   timeout: Int(0),
   url: Str(""),
   contacts: TupleList([]),
+  metrics: PromMetrics(getEmptyPromMetric()),
 };
 
-module PingFormConfig = {
+module PromFormConfig = {
   type field = pingFormTypes;
   type state = pingFormState;
   let update = (field, value, state) => {
@@ -35,6 +44,7 @@ module PingFormConfig = {
     | (Timeout, v) => {...state, timeout: v}
     | (Url, v) => {...state, url: v}
     | (Contacts, v) => {...state, contacts: v}
+    | (PromMetrics, v) => {...state, metrics: v}
     };
   };
   let get = (field, state) => {
@@ -44,11 +54,36 @@ module PingFormConfig = {
     | Timeout => state.timeout
     | Url => state.url
     | Contacts => state.contacts
+    | PromMetrics => state.metrics
     };
   };
 };
 
-module PingForm = Form.FormComponent(PingFormConfig);
+module PromForm = Form.FormComponent(PromFormConfig);
+
+let labelCheck = (value, _) => {
+  Models.Test.(
+    switch (value) {
+    | Form.PromMetrics(metrics) =>
+      switch (
+        metrics
+        |> List.find(metric => {
+             switch (
+               metric.labels
+               |> List.find(label => fst(label) == "" || snd(label) == "")
+             ) {
+             | exception Not_found => false
+             | _badLabel => true
+             }
+           })
+      ) {
+      | exception Not_found => true
+      | _badLabel => false
+      }
+    | _ => true
+    }
+  );
+};
 
 let rules = [
   (TestName, [(Form.NotEmpty, FormHelpers.emptyMsg)]),
@@ -61,6 +96,16 @@ let rules = [
       (
         Form.Custom(FormHelpers.validContactThreshold),
         FormHelpers.thresholdMsg,
+      ),
+    ],
+  ),
+  (
+    PromMetrics,
+    [
+      (Form.NotEmpty, "Lower bound < Upper bound and Key not empty"),
+      (
+        Form.Custom(labelCheck),
+        "Fill all label pairs or remove unused once",
       ),
     ],
   ),
@@ -77,17 +122,17 @@ let getTestPayload = (~inputTest=?, values) => {
       | None => ()
       }
     )
-
   | None => ()
   };
 
-  FormHelpers.setJsonKey(payload, "test_type", Str("Ping"));
+  FormHelpers.setJsonKey(payload, "test_type", Str("Prometheus"));
   FormHelpers.setJsonKey(payload, "test_name", values.testName);
   FormHelpers.setJsonKey(payload, "timeout", values.timeout);
   FormHelpers.setJsonKey(payload, "url", values.url);
   FormHelpers.setJsonKey(payload, "interval", values.interval);
 
   let blob = Js.Dict.empty();
+  FormHelpers.setJsonKey(blob, "metric_tests", values.metrics);
   Js.Dict.set(payload, "blob", Js.Json.object_(blob));
 
   payload;
@@ -150,14 +195,17 @@ let make =
 
   let handleTryTest = (values, errors) => {
     setSubmitted(_ => true);
+    Js.log(" Errors V ");
+    Js.log(errors);
     if (List.length(errors) == 0) {
       setTryTestMsg(_ => "Loading...");
       let payload = getTestPayload(values);
+      Js.log(" Payload V ");
+      Js.log(payload);
       Api.tryTest(payload, tryTestCallback);
     };
   };
-  <PingForm
-    rules
+  <PromForm
     initialState={
                    let init = getInitialFormState();
                    switch (inputTest) {
@@ -167,6 +215,12 @@ let make =
                      init.interval = Int(test.interval);
                      init.timeout = Int(test.timeout);
                      init.url = Str(test.url);
+                     init.metrics = (
+                       switch (test.specific) {
+                       | Prometheus(p) => PromMetrics(p.metrics)
+                       | _ => PromMetrics(getEmptyPromMetric())
+                       }
+                     );
                    };
                    switch (inputTestContacts) {
                    | None => ()
@@ -184,7 +238,8 @@ let make =
                    };
                    init;
                  }
-    render={(f: PingForm.form) =>
+    rules
+    render={(f: PromForm.form) =>
       <form
         onSubmit={e => handleSubmit(e, f.form.values, f.form.errors)}
         className="w-full">
@@ -233,8 +288,8 @@ let make =
           <FormInput
             type_=Text
             width=Full
-            label="Hostname"
-            infoText="Hostname that will be pinged (*)"
+            label="Url"
+            infoText="Url of prometheus metrics (*)"
             errorMsg={
               submitted
                 ? FormHelpers.getError(Url, f.form.errors) : React.null
@@ -244,6 +299,14 @@ let make =
             onChange={v => v |> f.handleChange(Url)}
           />
         </div>
+        <FormPromMetrics
+          errorMsg={
+            submitted
+              ? FormHelpers.getError(PromMetrics, f.form.errors) : React.null
+          }
+          metrics={f.form.values.metrics}
+          onChange={v => Form.PromMetrics(v) |> f.handleChange(PromMetrics)}
+        />
         <FormTestContacts
           errorMsg={
             submitted

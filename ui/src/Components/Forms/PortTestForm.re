@@ -5,7 +5,9 @@ type pingFormTypes =
   | Timeout
   | Url
   /* Contacts */
-  | Contacts;
+  | Contacts
+  /* Port tests */
+  | Port;
 
 type pingFormState = {
   /* Poll tests */
@@ -15,6 +17,8 @@ type pingFormState = {
   mutable url: Form.t,
   /* Contacts */
   mutable contacts: Form.t,
+  /* Port tests */
+  mutable port: Form.t,
 };
 
 let getInitialFormState = () => {
@@ -23,6 +27,7 @@ let getInitialFormState = () => {
   timeout: Int(0),
   url: Str(""),
   contacts: TupleList([]),
+  port: Str(""),
 };
 
 module PingFormConfig = {
@@ -35,15 +40,17 @@ module PingFormConfig = {
     | (Timeout, v) => {...state, timeout: v}
     | (Url, v) => {...state, url: v}
     | (Contacts, v) => {...state, contacts: v}
+    | (Port, v) => {...state, port: v}
     };
   };
   let get = (field, state) => {
     switch (field) {
     | TestName => state.testName
     | Interval => state.interval
-    | Timeout => state.timeout
+    | Timeout => state.interval
     | Url => state.url
     | Contacts => state.contacts
+    | Port => state.port
     };
   };
 };
@@ -64,9 +71,10 @@ let rules = [
       ),
     ],
   ),
+  (Port, [(Form.NotEmpty, FormHelpers.emptyMsg)]),
 ];
 
-let getTestPayload = (~inputTest=?, values) => {
+let getTestPayload = (~inputTest=?, values, testType) => {
   let payload = Js.Dict.empty();
   switch (inputTest) {
   | Some(test) =>
@@ -81,13 +89,14 @@ let getTestPayload = (~inputTest=?, values) => {
   | None => ()
   };
 
-  FormHelpers.setJsonKey(payload, "test_type", Str("Ping"));
+  FormHelpers.setJsonKey(payload, "test_type", Str(testType));
   FormHelpers.setJsonKey(payload, "test_name", values.testName);
   FormHelpers.setJsonKey(payload, "timeout", values.timeout);
   FormHelpers.setJsonKey(payload, "url", values.url);
   FormHelpers.setJsonKey(payload, "interval", values.interval);
 
   let blob = Js.Dict.empty();
+  FormHelpers.setJsonKey(blob, "port", values.port);
   Js.Dict.set(payload, "blob", Js.Json.object_(blob));
 
   payload;
@@ -96,6 +105,7 @@ let getTestPayload = (~inputTest=?, values) => {
 [@react.component]
 let make =
     (
+      ~testType,
       ~submitTest,
       ~submitContacts,
       ~inputTest: option(Models.Test.t)=?,
@@ -143,7 +153,7 @@ let make =
     ReactEvent.Form.preventDefault(e);
     setSubmitted(_ => true);
     if (List.length(errors) == 0) {
-      let payload = getTestPayload(values, ~inputTest);
+      let payload = getTestPayload(values, testType, ~inputTest);
       submitTest(payload, postCallback(values));
     };
   };
@@ -152,12 +162,11 @@ let make =
     setSubmitted(_ => true);
     if (List.length(errors) == 0) {
       setTryTestMsg(_ => "Loading...");
-      let payload = getTestPayload(values);
+      let payload = getTestPayload(values, testType);
       Api.tryTest(payload, tryTestCallback);
     };
   };
   <PingForm
-    rules
     initialState={
                    let init = getInitialFormState();
                    switch (inputTest) {
@@ -167,6 +176,11 @@ let make =
                      init.interval = Int(test.interval);
                      init.timeout = Int(test.timeout);
                      init.url = Str(test.url);
+                     switch (test.specific) {
+                     | TLS(port)
+                     | TCP(port) => init.port = Str(port.port)
+                     | _ => ()
+                     };
                    };
                    switch (inputTestContacts) {
                    | None => ()
@@ -184,6 +198,7 @@ let make =
                    };
                    init;
                  }
+    rules
     render={(f: PingForm.form) =>
       <form
         onSubmit={e => handleSubmit(e, f.form.values, f.form.errors)}
@@ -242,6 +257,21 @@ let make =
             placeholder="google.com"
             value={f.form.values.url}
             onChange={v => v |> f.handleChange(Url)}
+          />
+        </div>
+        <div className="flex flex-wrap -mx-3 mb-6">
+          <FormInput
+            type_=Text
+            width=Full
+            label="Port"
+            infoText="The port of the hostname (*)"
+            errorMsg={
+              submitted
+                ? FormHelpers.getError(Port, f.form.errors) : React.null
+            }
+            placeholder="443"
+            value={f.form.values.port}
+            onChange={v => v |> f.handleChange(Port)}
           />
         </div>
         <FormTestContacts

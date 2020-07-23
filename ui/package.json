@@ -4,7 +4,7 @@
   "main": "index.js",
   "license": "MIT",
   "scripts": {
-    "dev": "npm-run-all --serial clean make --parallel watch:bs watch:css serve:parcel",
+    "dev": "npm-run-all --serial clean make --parallel watch:bs serve:parcel",
     "serve:parcel": "parcel serve -p 8080 --hmr-port 8081 index.html",
     "clean": "npm-run-all clean:*",
     "clean:css": "rm -rf ./lib/css",

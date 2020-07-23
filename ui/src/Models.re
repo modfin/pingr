@@ -12,18 +12,32 @@ module Test = {
     key: string,
     lowerBound: float,
     upperBound: float,
-    labels: option(Js.Dict.t(string)),
+    labels: list((Js.Dict.key, string)),
   };
 
   type portTest = {port: string};
 
-  type promMetrics = {metrics: array(promMetric)};
+  type promMetrics = {metrics: list(promMetric)};
+
+  type dns = {
+    record: string,
+    strategy: string,
+    check: list(string),
+  };
+
+  type ssh = {
+    username: string,
+    port: string,
+    credentialType: string,
+  };
 
   type specificTestInfo =
     | HTTP(http)
     | Prometheus(promMetrics)
     | TLS(portTest)
     | TCP(portTest)
+    | DNS(dns)
+    | SSH(ssh)
     | Empty;
 
   type t = {
@@ -95,17 +109,40 @@ module Decode = {
             lowerBound: json |> Decode.field("lower_bound", Decode.float),
             upperBound: json |> Decode.field("upper_bound", Decode.float),
             labels:
-              json
-              |> Decode.field(
-                   "labels",
-                   Decode.optional(Decode.dict(Decode.string)),
-                 ),
+              (
+                switch (
+                  json
+                  |> Decode.field(
+                       "labels",
+                       Decode.optional(Decode.dict(Decode.string)),
+                     )
+                ) {
+                | Some(labels) => labels
+                | None => Js.Dict.empty()
+                }
+              )
+              |> Js.Dict.entries
+              |> Array.to_list,
           };
         };
         Test.Prometheus({
           metrics:
-            json |> Decode.field("metric_tests", Decode.array(metricDecoder)),
+            json |> Decode.field("metric_tests", Decode.list(metricDecoder)),
         });
+      | "DNS" =>
+        Test.DNS({
+          record: json |> Decode.field("record", Decode.string),
+          strategy: json |> Decode.field("strategy", Decode.string),
+          check: json |> Decode.field("check", Decode.list(Decode.string)),
+        })
+      | "SSH" =>
+        Test.SSH({
+          username: json |> Decode.field("username", Decode.string),
+          port: json |> Decode.field("port", Decode.string),
+          credentialType:
+            json |> Decode.field("credential_type", Decode.string),
+        })
+
       | _ => Test.Empty
       }
     );
