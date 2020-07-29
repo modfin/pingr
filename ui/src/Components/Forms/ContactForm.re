@@ -108,7 +108,7 @@ let make = (~submitContact, ~inputContact: option(Models.Contact.t)=?) => {
     };
   };
 
-  <div className="p-4 lg:w-1/2">
+  <div className="px-6 py-2 lg:w-1/2">
     <ContactForm
       initialState={
                      let init = getInitialFormState();
@@ -126,8 +126,8 @@ let make = (~submitContact, ~inputContact: option(Models.Contact.t)=?) => {
         <form
           className="w-full"
           onSubmit={e => handleSubmit(e, f.form.values, f.form.errors)}>
-          <div className="flex flex-wrap -mx-3 mb-6">
-            <div className="w-full md:w-1/2 px-3 mb-6 md:mb-0">
+          <div className="flex flex-wrap -mx-3 mb-3">
+            <div className="w-full md:w-1/2 px-3 mb-6">
               <label
                 className="block uppercase tracking-wide text-gray-700 text-xs font-bold mb-2">
                 {"Type" |> React.string}
@@ -219,7 +219,16 @@ let make = (~submitContact, ~inputContact: option(Models.Contact.t)=?) => {
                 }
                 className="appearance-none block w-full bg-gray-200 text-gray-700 border border-gray-200 rounded py-3 px-4 leading-tight focus:outline-none focus:bg-white focus:border-gray-500"
                 type_="text"
-                placeholder="https://example.com"
+                placeholder={
+                  switch (f.form.values.contactType) {
+                  | Str(type_) =>
+                    switch (type_) {
+                    | "smtp" => "example@gmail.com"
+                    | _ => "https://example.com"
+                    }
+                  | _ => "https://example.com"
+                  }
+                }
               />
               {FormHelpers.getError(ContactUrl, f.form.errors) != React.null
                && submitted

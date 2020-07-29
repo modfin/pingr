@@ -45,10 +45,24 @@ module Test = {
     testName: string,
     testType: string,
     timeout: int,
+    active: bool,
     url: string,
     interval: int,
     createdAt: string,
+    statusId: option(int),
     specific: specificTestInfo,
+  };
+};
+
+module TestStatus = {
+  type t = {
+    testId: string,
+    testName: string,
+    testType: string,
+    active: bool,
+    url: string,
+    statusId: int,
+    responseTime: int,
   };
 };
 
@@ -82,6 +96,34 @@ module TestContact = {
   };
 };
 
+module Incident = {
+  type t = {
+    incidentId: int,
+    testId: string,
+    active: bool,
+    rootCause: string,
+    createdAt: string,
+    closedAt: string,
+    testName: string,
+  };
+};
+module IncidentContactLog = {
+  type t = {
+    incidentId: int,
+    contactId: string,
+    message: string,
+    createdAt: string,
+    contactName: string,
+  };
+};
+
+module IncidentFull = {
+  type t = {
+    incident: Incident.t,
+    contactLog: option(list(IncidentContactLog.t)),
+  };
+};
+
 module Decode = {
   let testSpecificInfo =
       (testType: string, json: Js.Json.t): Test.specificTestInfo => {
@@ -94,12 +136,12 @@ module Decode = {
           Test.HTTP({
             reqMethod: json |> field("req_method", string),
             reqHeaders:
-              json |> field("req_headers", optional(dict(string))),
-            reqBody: json |> field("req_body", optional(string)),
-            resStatus: json |> field("res_status", optional(int)),
+              json |> optional(field("req_headers", dict(string))),
+            reqBody: json |> optional(field("req_body", string)),
+            resStatus: json |> optional(field("res_status", int)),
             resHeaders:
               json |> field("res_headers", optional(dict(string))),
-            resBody: json |> field("res_body", optional(string)),
+            resBody: json |> optional(field("res_body", string)),
           })
         )
       | "Prometheus" =>
@@ -112,9 +154,8 @@ module Decode = {
               (
                 switch (
                   json
-                  |> Decode.field(
-                       "labels",
-                       Decode.optional(Decode.dict(Decode.string)),
+                  |> Decode.optional(
+                       Decode.field("labels", Decode.dict(Decode.string)),
                      )
                 ) {
                 | Some(labels) => labels
@@ -156,14 +197,32 @@ module Decode = {
         testName: json |> field("test_name", string),
         testType,
         timeout: json |> field("timeout", int),
+        active: json |> field("active", bool),
         url: json |> field("url", string),
         interval: json |> field("interval", int),
         createdAt: json |> field("created_at", string),
+        statusId: json |> optional(field("status_id", int)),
         specific: json |> field("blob", testSpecificInfo(testType)),
       }
     );
   };
   let tests = (json): array(Test.t) => Json.Decode.array(test, json);
+
+  let testStatus = json => {
+    TestStatus.(
+      Json.Decode.{
+        testId: json |> field("test_id", string),
+        testName: json |> field("test_name", string),
+        testType: json |> field("test_type", string),
+        active: json |> field("active", bool),
+        url: json |> field("url", string),
+        statusId: json |> field("status_id", int),
+        responseTime: json |> field("response_time", int),
+      }
+    );
+  };
+
+  let testsStatus = json => Json.Decode.array(testStatus, json);
 
   let log = json =>
     Log.(
@@ -202,4 +261,43 @@ module Decode = {
     );
   let testContacts = (json): list(TestContact.t) =>
     Json.Decode.list(testContact, json);
+
+  let incident = json => {
+    Incident.(
+      Json.Decode.{
+        incidentId: json |> field("incident_id", int),
+        testId: json |> field("test_id", string),
+        active: json |> field("active", bool),
+        rootCause: json |> field("root_cause", string),
+        createdAt: json |> field("created_at", string),
+        closedAt:
+          json |> field("closed_at", json => json |> field("Time", string)),
+        testName: json |> field("test_name", string),
+      }
+    );
+  };
+  let incidents = (json): list(Incident.t) =>
+    Json.Decode.list(incident, json);
+
+  let incidentContactLog = json =>
+    IncidentContactLog.(
+      Json.Decode.{
+        incidentId: json |> field("incident_id", int),
+        contactId: json |> field("contact_id", string),
+        message: json |> field("message", string),
+        createdAt: json |> field("created_at", string),
+        contactName: json |> field("contact_name", string),
+      }
+    );
+  let incidentContactLogs = json =>
+    Json.Decode.list(incidentContactLog, json);
+
+  let incidentFull = json =>
+    IncidentFull.(
+      Json.Decode.{
+        incident: json |> field("incident", incident),
+        contactLog:
+          json |> optional(field("contact_log", incidentContactLogs)),
+      }
+    );
 };

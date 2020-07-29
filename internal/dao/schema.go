@@ -11,6 +11,12 @@ INSERT INTO _schema(version, created_at) VALUES (0, CURRENT_TIMESTAMP) ON CONFLI
 
 
 const _schema_v1_down = `
+-- name: drop-incident-contact-log
+DROP TABLE IF EXISTS incident_contact_log ;
+
+-- name: drop-incidents
+DROP TABLE IF EXISTS incidents ;
+
 -- name: drop-test-contact-mapper
 DROP TABLE IF EXISTS test_contacts ;
 
@@ -49,6 +55,7 @@ CREATE TABLE IF NOT EXISTS tests (
     interval INTEGER NOT NULL,
     timeout  INTEGER NOT NULL,
     created_at TIMESTAMP NOT NULL,
+	active INTEGER NOT NULL,
     blob BLOB
 )
 ;
@@ -103,6 +110,31 @@ VALUES
     (2, "Error"),
     (3, "TimedOut"),
     (5, "Initialized"),
-    (6, "Deleted")
+    (6, "Paused")
 ;
+
+-- name: create-incidents
+CREATE TABLE IF NOT EXISTS incidents (
+    incident_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    test_id TEXT NOT NULL,
+    active INTEGER NOT NULL,
+	root_cause TEXT NOT NULL,
+    created_at TIMESTAMP NOT NULL,
+	closed_at TIMESTAMP,
+    FOREIGN KEY (test_id)
+        REFERENCES tests (test_id)
+);
+
+-- name: create-incident_contact_log
+CREATE TABLE IF NOT EXISTS incident_contact_log (
+    incident_id INTEGER,
+    contact_id TEXT NOT NULL,
+	message TEXT NOT NULL,
+    created_at TIMESTAMP NOT NULL,
+    FOREIGN KEY (contact_id)
+        REFERENCES contacts (contact_id),
+    FOREIGN KEY (incident_id)
+        REFERENCES incidents (incident_id)
+);
+
 `

@@ -14,10 +14,8 @@ let testTypes = [
 let make = () => {
   let (testType, setTestType) = React.useState(_ => Form.Str(""));
   <>
-    <div className="relative bg-gray-400 my-4 p-1">
-      <p className="text-xl font-bold mx-4"> {"New test" |> React.string} </p>
-    </div>
-    <div className="px-4 pt-4 lg:w-1/2">
+    <Divider title="New test" />
+    <div className="px-6 py-2 lg:w-1/2">
       <div className="flex flex-wrap -mx-3 mb-6">
         <FormSelect
           width=Full

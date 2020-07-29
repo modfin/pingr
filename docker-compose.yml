@@ -14,9 +14,13 @@ services:
     environment:
       DEV: |-
         true
+      BASE_URL: "http://localhost:8080"
+      BASIC_AUTH_USER: "dev"
+      BASIC_AUTH_PASS: "123abc"
       SMTP_HOST: "smtp.gmail.com"
       SMTP_USERNAME: "pingrman@gmail.com"
       SMTP_PASSWORD: "2KPy8WJr2uLC46g"
+      AES_KEY: "6368616e676520746869732070617373776f726420746f206120736563726574"
     ports:
     - "8080:8080"
     volumes:

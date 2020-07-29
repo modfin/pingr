@@ -6,80 +6,38 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
-	"encoding/json"
 	"io"
+	"pingr/internal/config"
 	"strings"
 )
 
-type User struct {
-	Password   string `json:"password" db:"-"`
-	Ciphertext string `json:"-" db:"Ciphertext"`
+type Protected struct {
+	Plain  string `json:"plain" db:"-"`
+	Cipher string `json:"-" db:"cipher"`
 }
 
-func (u *User) Seal() error {
-	plaintext, err  := json.Marshal(u)
-	if err != nil{
-		return err
-	}
-
-	u.Ciphertext, err = seal(plaintext)
-	if err != nil{
-		return err
-	}
-	u.Password = ""
-	return nil
-}
-
-func (u *User) Open() error {
-	data, err := open(u.Ciphertext)
+func (u *Protected) Seal() error {
+	var err error
+	u.Cipher, err = seal([]byte(u.Plain))
 	if err != nil {
 		return err
 	}
-	err = json.Unmarshal(data, &u)
-	if err != nil {
-		return err
-	}
-	u.Ciphertext = ""
+	u.Plain = ""
 	return nil
 }
 
-type SSHKey struct {
-	PEM        string `json:"key" db:"-"`
-	Ciphertext string `json:"-" db:"Ciphertext"`
-}
-
-func (u *SSHKey) Seal() error {
-	plaintext, err  := json.Marshal(u)
-	if err != nil{
-		return err
-	}
-
-	u.Ciphertext, err = seal(plaintext)
-	if err != nil{
-		return err
-	}
-	u.PEM = ""
-	return nil
-}
-
-func (u *SSHKey) Open() error {
-	data, err := open(u.Ciphertext)
+func (u *Protected) Open() error {
+	data, err := open(u.Cipher)
 	if err != nil {
 		return err
 	}
-	err = json.Unmarshal(data, &u)
-	if err != nil {
-		return err
-	}
-	u.Ciphertext = ""
+	u.Plain = string(data)
+	u.Cipher = ""
 	return nil
 }
 
-
-func seal(plaintext []byte) (string, error){
-	// TODO get real key
-	key, _ := hex.DecodeString("6368616e676520746869732070617373776f726420746f206120736563726574")
-
+func seal(plaintext []byte) (string, error) {
+	key, _ := hex.DecodeString(config.Get().AESKey)
 
 	block, err := aes.NewCipher(key)
 	if err != nil {
@@ -89,7 +47,7 @@ func seal(plaintext []byte) (string, error){
 	// Never use more than 2^32 random nonces with a given key because of the risk of a repeat.
 	nonce := make([]byte, 12)
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
-		return "",err
+		return "", err
 	}
 
 	aesgcm, err := cipher.NewGCM(block)
@@ -101,9 +59,8 @@ func seal(plaintext []byte) (string, error){
 	return base64.StdEncoding.EncodeToString(nonce) + "." + base64.StdEncoding.EncodeToString(ciphertext), nil
 
 }
-func open(data string) ([]byte, error){
-	// TODO get real key
-	key, _ := hex.DecodeString("6368616e676520746869732070617373776f726420746f206120736563726574")
+func open(data string) ([]byte, error) {
+	key, _ := hex.DecodeString(config.Get().AESKey)
 
 	block, err := aes.NewCipher(key)
 	if err != nil {
@@ -127,4 +84,3 @@ func open(data string) ([]byte, error){
 
 	return aesgcm.Open(nil, nonce, ciphertext, nil)
 }
-

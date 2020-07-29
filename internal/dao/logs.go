@@ -118,6 +118,19 @@ func DeleteLog(logId uint64, db *sqlx.DB) error {
 	return nil
 }
 
+func DeleteTestLogs(testId string, db *sqlx.DB) error {
+	q := `
+		DELETE FROM logs
+		WHERE test_id = $1
+	`
+	_, err := db.Exec(q, testId)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func DeleteLastNLogs(n uint, db *sqlx.DB) error {
 	q := `
 		DELETE FROM logs

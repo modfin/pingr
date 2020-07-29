@@ -43,6 +43,7 @@ func Prometheus(testId string, body []byte, metricTests []MetricTest) error {
 		if !ok {
 			return fmt.Errorf("invalid prometheus key: %s", metricTest.Key)
 		}
+		oneMatch := false
 		for _, keyMetric := range keyMetricFamily.Metric {
 			labelCount := 0
 			for _, labelPair := range keyMetric.Label {
@@ -52,8 +53,9 @@ func Prometheus(testId string, body []byte, metricTests []MetricTest) error {
 				}
 			}
 			if labelCount != len(metricTest.Labels) {
-				return fmt.Errorf("no mathing labels for prometheus key: %s with labels: %v", metricTest.Key, metricTest.Labels)
+				continue
 			}
+			oneMatch = true
 
 			switch keyMetricFamily.Type.String() {
 			case "GAUGE":
@@ -80,8 +82,11 @@ func Prometheus(testId string, body []byte, metricTests []MetricTest) error {
 				mu.Unlock()
 			}
 		}
+		if !oneMatch {
+			return fmt.Errorf("no mathing labels for prometheus key: %s with labels: %v", metricTest.Key, metricTest.Labels)
+		}
 	}
-	return nil
+	return err
 }
 
 

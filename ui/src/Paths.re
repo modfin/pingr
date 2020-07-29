@@ -30,6 +30,10 @@ let goToEditContact = id => {
   goTo("/contacts/" ++ id ++ "/edit");
 };
 
-let goToDashboard = () => {
-  goTo("/");
+let goToIncidents = () => {
+  goTo("/incidents");
+};
+
+let goToIncident = id => {
+  goTo("/incidents/" ++ id);
 };

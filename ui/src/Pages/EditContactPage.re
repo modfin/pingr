@@ -43,11 +43,7 @@ let make = (~id) => {
   | Failed(msg) => <div> {ReasonReact.string(msg)} </div>
   | Success(contact) =>
     <>
-      <div className="relative bg-gray-400 my-4 p-1">
-        <p className="text-xl font-bold ml-1">
-          {"Edit test" |> React.string}
-        </p>
-      </div>
+      <Divider title="Edit tests" />
       <ContactForm submitContact=Api.putContact inputContact=contact />
     </>
   };

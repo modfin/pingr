@@ -12,37 +12,30 @@ import (
 func SSH(hostname string, port string, timeOut time.Duration, username string, credentialType string, credential string) (time.Duration, error) {
 	var authMethod ssh.AuthMethod
 	
+	protected := sec.Protected{
+		Cipher: credential,
+	}
+	err := protected.Open()
+	if err != nil {
+		return 0, errors.New("could not open protected data: " + err.Error())
+	}
+
 	switch(credentialType) {
 	case "key":
-		key := sec.SSHKey{
-			Ciphertext: credential,
-		}
-		err := key.Open()
+		signer, err := ssh.ParsePrivateKey([]byte(protected.Plain))
 		if err != nil {
-			return 0, errors.New("could not open ssh key: " + err.Error())
+			return 0, errors.New("could not parse private key: " + err.Error())
 		}
-		signer, err := ssh.ParsePrivateKey([]byte(key.PEM))
 		authMethod = ssh.PublicKeys(signer)
-		err = key.Seal()
-		if err != nil {
-			return 0, errors.New("could not seal ssh key: " + err.Error())
-		}
 	case "userpass":
-		user := sec.User{
-			Ciphertext: credential,
-		}
-		err := user.Open()
-		if err != nil {
-			return 0, errors.New("could not open password: " + err.Error())
-		}
-		authMethod = ssh.Password(user.Password)
-		err = user.Seal()
-		if err != nil {
-			return 0, errors.New("could not seal password: " + err.Error())
-		}
-
+		authMethod = ssh.Password(protected.Plain)
 	default:
 		return 0, fmt.Errorf("invalid ssh credential type %s", credentialType)
+	}
+
+	err = protected.Seal()
+	if err != nil {
+		return 0, errors.New("could not seal ssh key: " + err.Error())
 	}
 
 	config := &ssh.ClientConfig{

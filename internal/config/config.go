@@ -9,9 +9,13 @@ import (
 
 type Config struct {
 	Dev           bool   `env:"DEV" envDefault:"false"`
+	BaseUrl	      string `env:"BASE_URL,required"`
 	Port          int    `env:"PORT" envDefault:"8080"`
 	SQLitePath    string `env:"SQLITE_PATH" envDefault:"pingr.sqlite"`
 	SQLiteMigrate bool   `env:"SQLITE_MIGRATE" envDefault:"false"`
+
+	BasicAuthUser	string `env:"BASIC_AUTH_USER,required"`
+	BasicAuthPass	string `env:"BASIC_AUTH_PASS,required"`
 
 	TermDuration time.Duration `env:"TERM_DURATION" envDefault:"20s"` // time allowed for graceful shutdown
 
@@ -20,7 +24,9 @@ type Config struct {
 	SMTPUsername string `env:"SMTP_USERNAME"`
 	SMTPPassword string `env:"SMTP_PASSWORD"`
 
-	MinDiscStorage uint64 `env:"MIN_DISC_STORAGE" envDefault:"5"`
+	AESKey string `env:"AES_KEY" envDefault:"6368616e676520746869732070617373776f726420746f206120736563726574"`
+
+	MinDiscStorage uint64 `env:"MIN_DISC_STORAGE" envDefault:"5"` // GB:s
 }
 
 var (

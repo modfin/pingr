@@ -37,9 +37,9 @@ let getInitialFormState = () => {
   contacts: TupleList([]),
   port: Str(""),
   credentialType: Str(""),
-  username: TupleList([]),
-  password: TupleList([]),
-  key: TupleList([]),
+  username: Str(""),
+  password: Str(""),
+  key: Str(""),
 };
 
 module SSHFormConfig = {
@@ -91,7 +91,7 @@ let keyValidation = (value, values) => {
   };
 };
 
-let rules = [
+let defaultRules = [
   (TestName, [(Form.NotEmpty, FormHelpers.emptyMsg)]),
   (Interval, [(Form.NotEmpty, FormHelpers.aboveZero)]),
   (Timeout, [(Form.NotEmpty, FormHelpers.aboveZero)]),
@@ -108,8 +108,6 @@ let rules = [
   (Port, [(Form.NotEmpty, FormHelpers.aboveZero)]),
   (CredentialType, [(Form.NotEmpty, FormHelpers.emptyMsg)]),
   (Username, [(Form.NotEmpty, FormHelpers.emptyMsg)]),
-  (Password, [(Form.Custom(pswValidation), FormHelpers.emptyMsg)]),
-  (Key, [(Form.Custom(keyValidation), FormHelpers.emptyMsg)]),
 ];
 
 let getTestPayload = (~inputTest=?, values) => {
@@ -119,8 +117,9 @@ let getTestPayload = (~inputTest=?, values) => {
     Models.Test.(
       switch (test) {
       | Some(test_) =>
-        FormHelpers.setJsonKey(payload, "test_id", Str(test_.testId))
-      | None => ()
+        FormHelpers.setJsonKey(payload, "test_id", Str(test_.testId));
+        Js.Dict.set(payload, "active", Js.Json.boolean(test_.active));
+      | None => Js.Dict.set(payload, "active", Js.Json.boolean(true))
       }
     )
 
@@ -162,6 +161,35 @@ let make =
   let (submitted, setSubmitted) = React.useState(_ => false);
   let (submitError, setSubmitError) = React.useState(() => "");
   let (tryTestMsg, setTryTestMsg) = React.useState(() => "");
+
+  let rules =
+    switch (inputTest) {
+    | None =>
+      defaultRules
+      @ [
+        (Password, [(Form.Custom(pswValidation), FormHelpers.emptyMsg)]),
+        (Key, [(Form.Custom(keyValidation), FormHelpers.emptyMsg)]),
+      ]
+    | Some(test) =>
+      switch (test.specific) {
+      | SSH(ssh) =>
+        switch (ssh.credentialType) {
+        | "userpass" =>
+          defaultRules
+          @ [(Key, [(Form.Custom(keyValidation), FormHelpers.emptyMsg)])]
+        | "key" =>
+          defaultRules
+          @ [
+            (
+              Password,
+              [(Form.Custom(pswValidation), FormHelpers.emptyMsg)],
+            ),
+          ]
+        | _ => defaultRules
+        }
+      | _ => defaultRules
+      }
+    };
 
   let rec postCallback = (values, resp) => {
     switch (resp) {
@@ -229,6 +257,7 @@ let make =
                      | SSH(ssh) =>
                        init.port = Str(ssh.port);
                        init.credentialType = Str(ssh.credentialType);
+                       init.username = Str(ssh.username);
                      | _ => ()
                      };
                    };
@@ -361,7 +390,19 @@ let make =
            | Str("key") =>
              <FormTextarea
                label="Key"
-               placeholder="-----BEGIN OPENSSH PRIVATE KEY-----......."
+               placeholder={
+                 switch (inputTest) {
+                 | None => "-----BEGIN OPENSSH PRIVATE KEY-----......."
+                 | Some(test) =>
+                   switch (test.specific) {
+                   | SSH(ssh) =>
+                     ssh.credentialType == "key"
+                       ? "Leave blank not to update"
+                       : "-----BEGIN OPENSSH PRIVATE KEY-----......."
+                   | _ => "-----BEGIN OPENSSH PRIVATE KEY-----......."
+                   }
+                 }
+               }
                value={f.form.values.key}
                onChange={v => v |> f.handleChange(Key)}
                errorMsg={
@@ -376,6 +417,18 @@ let make =
                width=Full
                label="Password"
                infoText="Password used for authentication (*)"
+               placeholder={
+                 switch (inputTest) {
+                 | None => ""
+                 | Some(test) =>
+                   switch (test.specific) {
+                   | SSH(ssh) =>
+                     ssh.credentialType == "userpass"
+                       ? "Leave blank not to update" : ""
+                   | _ => ""
+                   }
+                 }
+               }
                errorMsg={
                  submitted
                    ? FormHelpers.getError(Password, f.form.errors)

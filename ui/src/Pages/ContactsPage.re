@@ -48,7 +48,12 @@ let make = () => {
       | Loadable.Loading =>
         Api.fetchContactsWithCallback(result =>
           switch (result) {
-          | None => dispatch(LoadFail("No contacts, add one above"))
+          | None =>
+            dispatch(
+              LoadFail(
+                "Not working, perhaps you haven't added any contacts yet?",
+              ),
+            )
           | Some(contacts) => dispatch(LoadSuccess(contacts))
           }
         )
@@ -59,80 +64,83 @@ let make = () => {
     [|state|],
   );
   <>
-    <div className="relative bg-gray-400 my-4 p-1 px-4">
-      <p className="text-xl font-bold ml-1"> {"Contacts" |> React.string} </p>
+    <Divider title="Contacts">
       <button
         onClick={_event => Paths.goToNewContact()}
-        className="m-1 bg-green-500 hover:bg-green-700 text-white py-1 px-2 rounded">
+        className="my-1 bg-green-500 hover:bg-green-700 text-white py-1 px-2 rounded">
         {"New contact" |> React.string}
       </button>
+    </Divider>
+    <div className="px-6">
+      {switch (state) {
+       | Loading =>
+         <div className="py-2"> {ReasonReact.string("Loading...")} </div>
+       | Failed(msg) =>
+         <div className="py-2"> {ReasonReact.string(msg)} </div>
+       | Success(contacts) =>
+         <>
+           <table className="table-auto text-left">
+             <thead>
+               <tr>
+                 <th className="px-4 py-2"> {"Name" |> React.string} </th>
+                 <th className="px-4 py-2"> {"Type" |> React.string} </th>
+                 <th className="px-4 py-2"> {"Url" |> React.string} </th>
+               </tr>
+             </thead>
+             <tbody>
+               Models.Contact.(
+                 {contacts
+                  |> List.map(contact => {
+                       <tr key={contact.contactId}>
+                         <td className="border px-4 py-2">
+                           {contact.contactName |> React.string}
+                         </td>
+                         <td className="border px-4 py-2">
+                           {contact.contactType |> React.string}
+                         </td>
+                         <td className="border px-4 py-2">
+                           {contact.contactUrl |> React.string}
+                         </td>
+                         <td className="border">
+                           <button
+                             onClick={_e =>
+                               Paths.goToEditContact(contact.contactId)
+                             }
+                             className="bg-red-transparent hover:underline text-blue-500 py-1 px-2">
+                             {"Edit" |> React.string}
+                           </button>
+                         </td>
+                         <td className="border">
+                           <button
+                             onClick={_e =>
+                               Api.deleteContact(contact.contactId, response => {
+                                 switch (response) {
+                                 | Success(msg) =>
+                                   setResponseMsg(_ => msg);
+                                   dispatch(LoadData);
+                                 | Error(msg) => setResponseMsg(_ => msg)
+                                 | SuccessJSON(_json) => () /* will not happen */
+                                 }
+                               })
+                             }
+                             className="bg-red-transparent hover:underline text-red-500 py-1 px-2">
+                             {"Delete" |> React.string}
+                           </button>
+                         </td>
+                       </tr>
+                     })
+                  |> Array.of_list
+                  |> React.array}
+               )
+             </tbody>
+           </table>
+           {responseMsg != ""
+              ? <p className="text-gray-500 text-xs italic">
+                  {responseMsg |> React.string}
+                </p>
+              : React.null}
+         </>
+       }}
     </div>
-    {switch (state) {
-     | Loading => <div> {ReasonReact.string("Loading...")} </div>
-     | Failed(msg) => <div className="px-4"> {ReasonReact.string(msg)} </div>
-     | Success(contacts) =>
-       <>
-         <table className="table-auto text-left mx-2">
-           <thead>
-             <tr>
-               <th className="px-4 py-2"> {"Name" |> React.string} </th>
-               <th className="px-4 py-2"> {"Type" |> React.string} </th>
-               <th className="px-4 py-2"> {"Url" |> React.string} </th>
-             </tr>
-           </thead>
-           <tbody>
-             Models.Contact.(
-               {contacts
-                |> List.map(contact => {
-                     <tr key={contact.contactId}>
-                       <td className="border px-4 py-2">
-                         {contact.contactName |> React.string}
-                       </td>
-                       <td className="border px-4 py-2">
-                         {contact.contactType |> React.string}
-                       </td>
-                       <td className="border px-4 py-2">
-                         {contact.contactUrl |> React.string}
-                       </td>
-                       <td>
-                         <button
-                           onClick={_e =>
-                             Paths.goToEditContact(contact.contactId)
-                           }
-                           className="ml-1 bg-blue-500 hover:bg-blue-700 text-white py-1 px-2 rounded">
-                           {"Edit" |> React.string}
-                         </button>
-                       </td>
-                       <td>
-                         <button
-                           onClick={_e =>
-                             Api.deleteContact(contact.contactId, response => {
-                               switch (response) {
-                               | Success(msg) =>
-                                 setResponseMsg(_ => msg);
-                                 dispatch(LoadData);
-                               | Error(msg) => setResponseMsg(_ => msg)
-                               | SuccessJSON(_json) => () /* will not happen */
-                               }
-                             })
-                           }
-                           className="bg-red-500 hover:bg-red-700 text-white py-1 px-2 rounded">
-                           {"Delete" |> React.string}
-                         </button>
-                       </td>
-                     </tr>
-                   })
-                |> Array.of_list
-                |> React.array}
-             )
-           </tbody>
-         </table>
-         {responseMsg != ""
-            ? <p className="text-gray-500 text-xs italic mx-2">
-                {responseMsg |> React.string}
-              </p>
-            : React.null}
-       </>
-     }}
   </>;
 };

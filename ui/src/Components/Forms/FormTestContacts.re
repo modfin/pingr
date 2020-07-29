@@ -38,7 +38,8 @@ let make = (~value, ~onChange, ~errorMsg) => {
     if (checked) {
       currContacts @ [contact];
     } else {
-      currContacts |> List.filter(testContact => testContact != contact);
+      currContacts
+      |> List.filter(testContact => fst(testContact) != fst(contact));
     };
 
   let updateThreshold = (contact: (string, string), currContacts) => {

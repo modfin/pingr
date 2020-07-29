@@ -7,42 +7,36 @@ import (
 	"time"
 )
 
-
 var (
 	primary *Bus
-	once sync.Once
+	once    sync.Once
 
-	ClosedErr = errors.New("topic is closed")
-	TimeoutErr=  errors.New("read timeout")
-
+	ClosedErr  = errors.New("topic is closed")
+	TimeoutErr = errors.New("push test timed out, no push received on time")
 )
 
-
-func init(){
+func init() {
 	once.Do(func() {
 		primary = New()
 	})
 }
 
-func Primary() *Bus{
+func Primary() *Bus {
 	return primary
 }
 
-
-
-func New() *Bus{
+func New() *Bus {
 	return &Bus{
 		topics: map[string]chan []byte{},
 	}
 }
-
 
 type Bus struct {
 	mu     sync.RWMutex
 	topics map[string]chan []byte
 }
 
-func (b *Bus) createChan(topic string) chan []byte{
+func (b *Bus) createChan(topic string) chan []byte {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	c, ok := b.topics[topic]
@@ -54,11 +48,10 @@ func (b *Bus) createChan(topic string) chan []byte{
 	return c
 }
 
-
-func (b *Bus) Publish(topic string, content []byte) (err error){
+func (b *Bus) Publish(topic string, content []byte) (err error) {
 	defer func() {
 		r := recover()
-		if r != nil{
+		if r != nil {
 			err = fmt.Errorf("topic is closed: %v", r)
 		}
 	}()
@@ -80,21 +73,19 @@ func (b *Bus) Publish(topic string, content []byte) (err error){
 
 }
 
-func (b *Bus) Close(topic string) error{
+func (b *Bus) Close(topic string) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	c, ok := b.topics[topic]
 	if !ok {
-	 	return errors.New("does not exist")
+		return errors.New("does not exist")
 	}
 	delete(b.topics, topic)
 	close(c)
 	return nil
 }
 
-
-
-func (b *Bus) Next(topic string, timeout time.Duration) ([]byte, error){
+func (b *Bus) Next(topic string, timeout time.Duration) ([]byte, error) {
 	b.mu.RLock()
 	c, ok := b.topics[topic]
 	b.mu.RUnlock()
@@ -103,13 +94,12 @@ func (b *Bus) Next(topic string, timeout time.Duration) ([]byte, error){
 	}
 
 	select {
-	case data, ok := <- c:
-		if !ok{
+	case data, ok := <-c:
+		if !ok {
 			return nil, ClosedErr
 		}
 		return data, nil
-	case <- time.After(timeout):
+	case <-time.After(timeout):
 		return nil, TimeoutErr
 	}
 }
-

@@ -1,6 +1,7 @@
 package pingr
 
 import (
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"pingr/internal/platform/dns"
 	"pingr/internal/poll"
 	"pingr/internal/push"
+	"pingr/internal/sec"
 	"time"
 )
 
@@ -19,6 +21,22 @@ type Log struct {
 	Message      string        `json:"message" db:"message"`
 	ResponseTime time.Duration `json:"response_time" db:"response_time"`
 	CreatedAt    time.Time     `json:"created_at" db:"created_at"`
+}
+
+type Incident struct {
+	IncidentId uint64       `json:"incident_id" db:"incident_id"`
+	TestId     string       `json:"test_id" db:"test_id"`
+	Active     bool         `json:"active" db:"active"`
+	RootCause  string       `json:"root_cause" db:"root_cause"`
+	CreatedAt  time.Time    `json:"created_at" db:"created_at"`
+	ClosedAt   sql.NullTime `json:"closed_at" db:"closed_at"`
+}
+
+type IncidentContactLog struct {
+	IncidentId uint64    `json:"incident_id" db:"incident_id"`
+	ContactId  string    `json:"contact_id" db:"contact_id"`
+	Message    string    `json:"message" db:"message"`
+	CreatedAt  time.Time `json:"created_at" db:"created_at"`
 }
 
 type Contact struct {
@@ -78,6 +96,7 @@ type BaseTest struct {
 	Url       string        `json:"url"`
 	Interval  time.Duration `json:"interval"`
 	CreatedAt time.Time     `json:"created_at" db:"created_at"`
+	Active    bool          `json:"active" db:"active"`
 }
 
 func (j BaseTest) Get() BaseTest {
@@ -439,11 +458,68 @@ func (t PrometheusPushTest) Validate() bool {
 	return true
 }
 
-func (t GenericTest) SensitiveTest() bool {
+type RequestType string
+
+const (
+	GET  RequestType = "GET"
+	POST RequestType = "POST"
+	PUT  RequestType = "PUT"
+)
+
+func (t *GenericTest) MaskSensitiveInfo(method RequestType, testDb *GenericTest) error {
 	switch t.TestType {
 	case "SSH":
-		return true
+		var sshTest SSHTest
+		body, err := json.Marshal(t)
+		if err != nil {
+			return errors.New("could not marshal test: " + err.Error())
+		}
+		err = json.Unmarshal(body, &sshTest)
+		if err != nil {
+			return errors.New("could not unmarshal into ssh test: " + err.Error())
+		}
+	inner:
+		switch method {
+		case GET:
+			sshTest.Blob.Credential = ""
+		case PUT:
+			if sshTest.Blob.Credential == "" {
+				// We do not wish to update the credentials
+				if testDb == nil {
+					return errors.New("mask sensitive data: bad test input")
+				}
+				var tmpSSHTest SSHTest
+				body, err := json.Marshal(*testDb)
+				if err != nil {
+					return errors.New("could not marshal test: " + err.Error())
+				}
+				err = json.Unmarshal(body, &tmpSSHTest)
+				if err != nil {
+					return errors.New("could not unmarshal into ssh test: " + err.Error())
+				}
+				sshTest.Blob.Credential = tmpSSHTest.Blob.Credential
+				break inner
+			}
+			fallthrough
+		case POST:
+			protected := sec.Protected{
+				Plain: sshTest.Blob.Credential,
+			}
+			err = protected.Seal()
+			if err != nil {
+				return errors.New("could not seal ssh credentials: " + err.Error())
+			}
+			sshTest.Blob.Credential = protected.Cipher
+
+		}
+
+		bytes, err := json.Marshal(sshTest.Blob)
+		if err != nil {
+			return errors.New("could not marshal sshTest.Blob: " + err.Error())
+		}
+		t.Blob = bytes
 	default:
-		return false
+		return nil
 	}
+	return nil
 }

@@ -83,6 +83,14 @@ let fetchTestWithCallback = (id, callback) => {
   fetchJsonWithCallback(p ++ "/tests/" ++ id, Models.Decode.test, callback);
 };
 
+let fetchTestsStatusWithCallback = callback => {
+  fetchJsonWithCallback(
+    p ++ "/tests/status",
+    Models.Decode.testsStatus,
+    callback,
+  );
+};
+
 let fetchLogsWithCallback = (~id=?, callback, ~numDays=?, ()) => {
   let path =
     p
@@ -115,6 +123,18 @@ let fetchTestContactsWithCallback = (id, callback) => {
     Models.Decode.testContacts,
     callback,
   );
+};
+
+let fetchIncidentWithCallback = (id, callback) => {
+  fetchJsonWithCallback(
+    p ++ "/incidents/" ++ id,
+    Models.Decode.incidentFull,
+    callback,
+  );
+};
+
+let fetchIncidentsWithCallback = callback => {
+  fetchJsonWithCallback(p ++ "/incidents", Models.Decode.incidents, callback);
 };
 
 let fetchJSONResponse = res => {
@@ -165,6 +185,24 @@ let tryTest = (payload, callback) => {
   let path = p ++ "/tests/test";
   Js.Promise.(
     JsonTransport.post(path, payload)
+    |> then_(res => res |> fetchTextResponse)
+    |> then_(response => callback(Success(response)) |> resolve)
+    |> catch(e => callback(Error([%bs.raw "e.message"])) |> resolve)
+    |> ignore
+  );
+};
+
+let updateActive = (testId, value, callback) => {
+  let path =
+    p
+    ++ "/tests/"
+    ++ testId
+    ++ "/"
+    ++ {
+      value ? "activate" : "deactivate";
+    };
+  Js.Promise.(
+    JsonTransport.put(path, Js.Dict.empty())
     |> then_(res => res |> fetchTextResponse)
     |> then_(response => callback(Success(response)) |> resolve)
     |> catch(e => callback(Error([%bs.raw "e.message"])) |> resolve)

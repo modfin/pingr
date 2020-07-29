@@ -117,8 +117,9 @@ let getTestPayload = (~inputTest=?, values) => {
     Models.Test.(
       switch (test) {
       | Some(test_) =>
-        FormHelpers.setJsonKey(testPayload, "test_id", Str(test_.testId))
-      | None => ()
+        FormHelpers.setJsonKey(testPayload, "test_id", Str(test_.testId));
+        Js.Dict.set(testPayload, "active", Js.Json.boolean(test_.active));
+      | None => Js.Dict.set(testPayload, "active", Js.Json.boolean(true))
       }
     )
 
@@ -133,7 +134,6 @@ let getTestPayload = (~inputTest=?, values) => {
 
   let blob = Js.Dict.empty();
   FormHelpers.setJsonKey(blob, "req_method", values.reqMethod);
-  Js.log(values.reqHeaders);
   if (values.reqHeaders == TupleList([])) {
     Js.Dict.set(blob, "req_headers", Js.Json.object_(Js.Dict.empty()));
   } else {

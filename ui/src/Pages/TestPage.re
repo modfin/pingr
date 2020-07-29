@@ -29,6 +29,8 @@ type testState =
 
 [@react.component]
 let make = (~id) => {
+  let (showData, setShowData) = React.useState(_ => false);
+
   let (state, dispatch) =
     React.useReducer(
       (_state, action) =>
@@ -40,17 +42,32 @@ let make = (~id) => {
       Loadable.Loading,
     );
 
-  React.useEffect0(() => {
-    Api.fetchTestWithCallback(id, result =>
-      switch (result) {
-      | None => dispatch(LoadFail("Not working"))
-      | Some(test) => dispatch(LoadSuccess(test))
-      }
-    );
-    None;
-  });
+  React.useEffect1(
+    () => {
+      if (state == Loadable.Loading) {
+        Api.fetchTestWithCallback(id, result =>
+          switch (result) {
+          | None => dispatch(LoadFail("Not working"))
+          | Some(test) => dispatch(LoadSuccess(test))
+          }
+        );
+      };
+      None;
+    },
+    [|state|],
+  );
 
   let (errorMsg, setErrorMsg) = React.useState(() => "");
+
+  let handleActiveChange = value => {
+    Api.updateActive(id, value, result => {
+      switch (result) {
+      | Api.Error(msg) => setErrorMsg(_ => msg)
+      | Api.Success(_)
+      | Api.SuccessJSON(_) => dispatch(LoadData)
+      }
+    });
+  };
 
   let deleteCallback = resp => {
     switch (resp) {
@@ -60,153 +77,283 @@ let make = (~id) => {
     };
   };
 
+  let stringOfTupleList = tupleList => {
+    let dictString = ref("{ ");
+    tupleList
+    |> List.iteri((i, tuple) => {
+         dictString := dictString^ ++ fst(tuple) ++ ": " ++ snd(tuple);
+         if (i != List.length(tupleList) - 1) {
+           dictString := dictString^ ++ ", ";
+         };
+       });
+    dictString := dictString^ ++ " }";
+    dictString^;
+  };
+
+  let stringOfDict = dict => {
+    let l = Js.Dict.entries(dict) |> Array.to_list;
+    stringOfTupleList(l);
+  };
+
   switch (state) {
   | Loading => <div> {ReasonReact.string("Loading...")} </div>
   | Failed(msg) => <div> {ReasonReact.string(msg)} </div>
   | Success(test) =>
     <>
-      <div className="relative bg-gray-400 my-4 p-1">
-        <p className="text-xl font-bold ml-1">
-          {"Test status: " ++ test.testName |> React.string}
+      <Divider title={"Test: " ++ test.testName}>
+        <div className="flex">
+          <b> {"Status: " |> React.string} </b>
+          {switch (test.active, test.statusId) {
+           | (false, _) =>
+             <div className="w-4 h-4 rounded bg-gray-500 tooltip mt-1 ml-1">
+               <span
+                 className="tooltip-text bg-gray-400 border text-black -mt-12">
+                 {"Paused" |> React.string}
+               </span>
+             </div>
+
+           | (true, Some(1)) =>
+             <div className="w-4 h-4 rounded bg-green-500 tooltip mt-1 ml-1">
+               <span
+                 className="tooltip-text bg-gray-400 border text-black -mt-12">
+                 {"Success" |> React.string}
+               </span>
+             </div>
+           | (true, Some(2)) =>
+             <div className="w-4 h-4 rounded bg-red-500 tooltip mt-1 ml-1">
+               <span
+                 className="tooltip-text bg-gray-400 border text-black -mt-12">
+                 {"Error" |> React.string}
+               </span>
+             </div>
+           | (true, Some(3)) =>
+             <div className="w-4 h-4 rounded bg-red-500 tooltip mt-1 ml-1">
+               <span
+                 className="tooltip-text bg-gray-400 border text-black -mt-12">
+                 {"Timed out" |> React.string}
+               </span>
+             </div>
+           | (true, Some(5)) =>
+             <div className="w-4 h-4 rounded bg-yellow-500 tooltip mt-1 ml-1">
+               <span
+                 className="tooltip-text bg-gray-400 border text-black -mt-12">
+                 {"Initialized" |> React.string}
+               </span>
+             </div>
+           | _ =>
+             <div className="w-4 h-4 rounded bg-gray-500 tooltip mt-1 ml-1">
+               <span
+                 className="tooltip-text bg-gray-400 border text-black -mt-12">
+                 {"Unknown status" |> React.string}
+               </span>
+             </div>
+           }}
+        </div>
+        <p>
+          {<b> {"Url: " |> React.string} </b>}
+          {(
+             switch (test.testType) {
+             | "HTTPPush"
+             | "PrometheusPush" =>
+               "/api/push/" ++ test.testId ++ "/" ++ test.testName
+             | _ => test.url
+             }
+           )
+           |> React.string}
         </p>
         <button
           type_="button"
+          onClick={_e => handleActiveChange(!test.active)}
+          className="my-1 bg-teal-500 hover:bg-teal-700 text-white py-1 px-2 rounded">
+          {(test.active ? "Pause" : "Activate") |> React.string}
+        </button>
+        <button
+          type_="button"
           onClick={_e => Paths.goToEditTest(id)}
-          className="m-1 bg-blue-500 hover:bg-blue-700 text-white py-1 px-2 rounded">
+          className="ml-2 bg-blue-500 hover:bg-blue-700 text-white py-1 px-2 rounded">
           {"Edit" |> React.string}
         </button>
         <button
           type_="button"
           onClick={_e => Api.deleteTest(test.testId, deleteCallback)}
-          className="m-1 bg-red-500 hover:bg-red-700 text-white py-1 px-2 rounded">
+          className="ml-2 bg-red-500 hover:bg-red-700 text-white py-1 px-2 rounded">
           {"Delete" |> React.string}
+        </button>
+        <button
+          type_="button"
+          onClick={_e => setShowData(prev => !prev)}
+          className="float-right my-1 bg-blue-500 hover:bg-blue-700 text-white py-1 px-2 rounded">
+          {{
+             showData ? "Hide data" : "Show data";
+           }
+           |> React.string}
         </button>
         {errorMsg != ""
            ? <p className="text-red-500 text-xs italic">
                {"Error deleteing test: " ++ errorMsg |> React.string}
              </p>
            : React.null}
-      </div>
-      <div className="grid grid-rows-2 grid-cols-2  gap-4 p-2">
-        <div className="col-span-2 row-span-1 md:col-span-1 md:row-span-2">
-          <p className="text-lg font-bold"> {"Standard" |> React.string} </p>
-          <DataField labelName="Type" value={test.testType} />
-          <DataField labelName="Url" value={test.url} />
-          <DataField
-            labelName="Interval"
-            value={string_of_int(test.interval) ++ " s"}
-          />
-          <DataField
-            labelName="Timeout"
-            value={string_of_int(test.timeout) ++ " s"}
-          />
-          <DataField
-            labelName="Created"
-            value={Js.Date.toLocaleString(
-              Js.Date.fromString(test.createdAt),
-            )}
-          />
-        </div>
-        <div className="col-span-2 row-span-1 md:col-span-1 md:row-span-2">
-          <p className="text-lg font-bold"> {"Specific" |> React.string} </p>
-          {switch (test.specific) {
-           | TLS(port)
-           | TCP(port) => <DataField labelName="Port" value={port.port} />
-           | HTTP(http) =>
-             <>
-               <DataField labelName="Method" value={http.reqMethod} />
-               <DataField
-                 labelName="Payload"
-                 value={
-                   switch (http.reqBody) {
-                   | None => "-"
-                   | Some(reqBody) => reqBody
-                   }
-                 }
-               />
-               <DataField
-                 labelName="Expected response"
-                 value={
-                   switch (http.resBody) {
-                   | None => "-"
-                   | Some(resBody) => resBody
-                   }
-                 }
-               />
-             </>
-           | Prometheus(promMetrics) =>
-             Models.Test.(
-               {
-                 promMetrics.metrics
-                 |> List.mapi((i, pMetric) => {
-                      <div key={pMetric.key}>
+      </Divider>
+      {showData
+         ? <>
+             <div className="grid grid-rows-2 grid-cols-2  gap-4 px-6 py-2">
+               <div
+                 className=" col-span-2 row-span-1 md:col-span-1 md:row-span-2">
+                 <p className="text-lg font-bold">
+                   {"Standard" |> React.string}
+                 </p>
+                 <DataField labelName="Type" value={test.testType} />
+                 {switch (test.testType) {
+                  | "HTTPPush"
+                  | "PrometheusPush" => React.null
+                  | _ =>
+                    <>
+                      <DataField labelName="Url" value={test.url} />
+                      <DataField
+                        labelName="Interval"
+                        value={string_of_int(test.interval) ++ " s"}
+                      />
+                    </>
+                  }}
+                 <DataField
+                   labelName="Timeout"
+                   value={string_of_int(test.timeout) ++ " s"}
+                 />
+                 <DataField
+                   labelName="Created"
+                   value={Js.Date.toLocaleString(
+                     Js.Date.fromString(test.createdAt),
+                   )}
+                 />
+               </div>
+               <div
+                 className="col-span-2 row-span-1 md:col-span-1 md:row-span-2">
+                 <p className="text-lg font-bold">
+                   {"Specific" |> React.string}
+                 </p>
+                 {switch (test.specific) {
+                  | TLS(port)
+                  | TCP(port) =>
+                    <DataField labelName="Port" value={port.port} />
+                  | HTTP(http) =>
+                    <>
+                      <DataField
+                        labelName="Request Method"
+                        value={http.reqMethod}
+                      />
+                      {switch (http.reqHeaders) {
+                       | None => React.null
+                       | Some(headers) =>
+                         headers != Js.Dict.empty()
+                           ? <DataField
+                               labelName="Request headers"
+                               value={stringOfDict(headers)}
+                             />
+                           : React.null
+                       }}
+                      {switch (http.reqBody) {
+                       | None => React.null
+                       | Some(body) =>
+                         body != ""
+                           ? <DataField labelName="Request body" value=body />
+                           : React.null
+                       }}
+                      {switch (http.resStatus) {
+                       | None => React.null
+                       | Some(status) =>
+                         status != 0
+                           ? <DataField
+                               labelName="Response status"
+                               value={string_of_int(status)}
+                             />
+                           : React.null
+                       }}
+                      {switch (http.resHeaders) {
+                       | None => React.null
+                       | Some(headers) =>
+                         headers != Js.Dict.empty()
+                           ? <DataField
+                               labelName="Response headers"
+                               value={stringOfDict(headers)}
+                             />
+                           : React.null
+                       }}
+                      {switch (http.resBody) {
+                       | None => React.null
+                       | Some(body) =>
+                         body != ""
+                           ? <DataField labelName="Request body" value=body />
+                           : React.null
+                       }}
+                    </>
+                  | Prometheus(promMetrics) =>
+                    Models.Test.(
+                      {
+                        promMetrics.metrics
+                        |> List.mapi((i, pMetric) => {
+                             <div key={pMetric.key}>
+                               <DataField
+                                 labelName={"Key " ++ string_of_int(i)}
+                                 value={pMetric.key}
+                               />
+                               <div className="ml-10 md:mr-5">
+                                 <DataField
+                                   labelName="Lower bound"
+                                   value={Js.Float.toString(
+                                     pMetric.lowerBound,
+                                   )}
+                                 />
+                                 <DataField
+                                   labelName="Upper bound"
+                                   value={Js.Float.toString(
+                                     pMetric.upperBound,
+                                   )}
+                                 />
+                                 <DataField
+                                   labelName="Labels"
+                                   value={stringOfTupleList(pMetric.labels)}
+                                 />
+                               </div>
+                             </div>
+                           })
+                        |> Array.of_list
+                        |> React.array;
+                      }
+                    )
+                  | DNS(dns) =>
+                    Models.Test.(
+                      <div>
+                        <DataField labelName="Record" value={dns.record} />
+                        <DataField labelName="Strategy" value={dns.strategy} />
                         <DataField
-                          labelName={"Key " ++ string_of_int(i)}
-                          value={pMetric.key}
+                          labelName="Check"
+                          value={List.nth(dns.check, 0)}
                         />
-                        <div className="ml-10 md:mr-5">
-                          <DataField
-                            labelName="Lower bound"
-                            value={Js.Float.toString(pMetric.lowerBound)}
-                          />
-                          <DataField
-                            labelName="Upper bound"
-                            value={Js.Float.toString(pMetric.upperBound)}
-                          />
-                          <DataField
-                            labelName="Labels"
-                            value={
-                                    let dictString = ref("{ ");
-                                    for (i in
-                                         0 to
-                                         List.length(pMetric.labels) - 1) {
-                                      dictString :=
-                                        dictString^
-                                        ++ fst(List.nth(pMetric.labels, i))
-                                        ++ ": "
-                                        ++ snd(List.nth(pMetric.labels, i))
-                                        ++ ", ";
-                                    };
-                                    dictString := dictString^ ++ "}";
-                                    dictString^;
-                                  }
-                          />
-                        </div>
                       </div>
-                    })
-                 |> Array.of_list
-                 |> React.array;
-               }
-             )
-           | DNS(dns) =>
-             Models.Test.(
-               <div>
-                 <DataField labelName="Record" value={dns.record} />
-                 <DataField labelName="Strategy" value={dns.strategy} />
-                 <DataField
-                   labelName="Check"
-                   value={List.nth(dns.check, 0)}
-                 />
+                    )
+                  | SSH(ssh) =>
+                    Models.Test.(
+                      <div>
+                        <DataField labelName="Port" value={ssh.port} />
+                        <DataField labelName="Username" value={ssh.username} />
+                        <DataField
+                          labelName="Credential type"
+                          value={ssh.credentialType}
+                        />
+                      </div>
+                    )
+                  | Empty => <DataField labelName="None" value="-" />
+                  }}
                </div>
-             )
-           | SSH(ssh) =>
-             Models.Test.(
-               <div>
-                 <DataField labelName="Port" value={ssh.port} />
-                 <DataField labelName="Username" value={ssh.username} />
-                 <DataField
-                   labelName="Credential type"
-                   value={ssh.credentialType}
-                 />
-               </div>
-             )
-           | Empty => <DataField labelName="None" value="-" />
-           }}
-        </div>
-      </div>
-      <TestContactsList testId={test.testId} />
-      <TestUptime testId={test.testId} />
-      <LogList testId={test.testId} />
+             </div>
+             <TestContactsList testId={test.testId} />
+           </>
+         : <div className="h-8">
+             <p className="text-center mt-2 italic">
+               {"Test data hidden" |> React.string}
+             </p>
+           </div>}
+      <TestStatus id={test.testId} />
     </>
   };
 };

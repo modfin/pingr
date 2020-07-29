@@ -102,8 +102,9 @@ let getTestPayload = (~inputTest=?, values) => {
     Models.Test.(
       switch (test) {
       | Some(test_) =>
-        FormHelpers.setJsonKey(payload, "test_id", Str(test_.testId))
-      | None => ()
+        FormHelpers.setJsonKey(payload, "test_id", Str(test_.testId));
+        Js.Dict.set(payload, "active", Js.Json.boolean(test_.active));
+      | None => Js.Dict.set(payload, "active", Js.Json.boolean(true))
       }
     )
 
@@ -203,6 +204,7 @@ let make =
                        init.record = Str(dns.record);
                        init.strategy = Str(dns.strategy);
                        init.check = List(dns.check);
+                     | _ => ()
                      };
                    };
                    switch (inputTestContacts) {

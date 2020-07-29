@@ -4,15 +4,16 @@ let make = () => {
 
   switch (url.path) {
   | ["tests", "new"] => <NewTestPage />
-  | ["tests", testId, "edit"] => <EditTestPage id=testId />
-  | ["tests", testId] => <TestPage id=testId />
+  | ["tests", id, "edit"] => <EditTestPage id />
+  | ["tests", id] => <TestPage id />
   | ["tests"] => <TestsPage />
   | ["contacts", "new"] => <NewContactPage />
-  | ["contacts", contactId, "edit"] => <EditContactPage id=contactId />
+  | ["contacts", id, "edit"] => <EditContactPage id />
   | ["contacts"] => <ContactsPage />
-  | ["logs"] => <LogList />
-  | [] => <DashboardPage />
+  | ["incidents"] => <IncidentsPage />
+  | ["incidents", id] => <IncidentPage id />
+  | [] => <TestsPage />
 
-  | _ => <div />
+  | _ => "404" |> React.string
   };
 };

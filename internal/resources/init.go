@@ -2,6 +2,7 @@ package resources
 
 import (
 	"context"
+	"crypto/subtle"
 	"fmt"
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo/v4"
@@ -16,6 +17,7 @@ import (
 	"pingr/internal/logging"
 	"pingr/internal/resources/contacts"
 	"pingr/internal/resources/health"
+	"pingr/internal/resources/incidents"
 	"pingr/internal/resources/logs"
 	"pingr/internal/resources/push"
 	"pingr/internal/resources/testcontacts"
@@ -24,21 +26,34 @@ import (
 )
 
 func Init(closing <-chan struct{}, db *sqlx.DB, buz *bus.Bus) {
+	cfg := config.Get()
+	basicAuth := middleware.BasicAuth(func(username, password string, c echo.Context) (bool, error) {
+		validUser := false
+		validPass := false
+		if subtle.ConstantTimeCompare([]byte(username), []byte(cfg.BasicAuthUser)) == 1 {
+			validUser = true
+		}
+		if subtle.ConstantTimeCompare([]byte(password), []byte(cfg.BasicAuthPass)) == 1 {
+			validPass = true
+		}
+		return validUser && validPass, nil
+	})
+
 
 	e := echo.New()
 	e.Use(logging.RequestIdMiddleware())
 	e.Use(logging.EchoMiddleware(nil))
 	e.Use(logging.GetDBMiddleware(db))
 	e.Use(middleware.Recover())
-	e.Use(middleware.CORS())
 
 	health.SetMetrics(e)
-	health.Init(closing, e.Group("api/health"))
+	health.Init(closing, e.Group("api/health", basicAuth))
 
-	tests.Init(e.Group("api/tests"), buz)
-	logs.Init(e.Group("api/logs"))
-	contacts.Init(e.Group("api/contacts"))
-	testcontacts.Init(e.Group("api/testcontacts"))
+	tests.Init(e.Group("api/tests", basicAuth), buz)
+	logs.Init(e.Group("api/logs", basicAuth))
+	contacts.Init(e.Group("api/contacts", basicAuth))
+	testcontacts.Init(e.Group("api/testcontacts", basicAuth))
+	incidents.Init(e.Group("api/incidents", basicAuth))
 
 	push.Init(e.Group("api/push"), buz)
 

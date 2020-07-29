@@ -5,6 +5,20 @@ import (
 	"pingr"
 )
 
+type TestStatus struct {
+	TestId       string `json:"test_id" db:"test_id"`
+	TestName     string `json:"test_name" db:"test_name"`
+	TestType     string `json:"test_type" db:"test_type"`
+	Active       bool   `json:"active" db:"active"`
+	Url          string `json:"url" db:"url"`
+	StatusId     int    `json:"status_id" db:"status_id"`
+	ResponseTime int    `json:"response_time" db:"response_time"`
+}
+
+type FullTestStatus struct {
+	pingr.GenericTest
+	StatusId     int    `json:"status_id" db:"status_id"`
+}
 
 func GetRawTests(db *sqlx.DB) ([]pingr.GenericTest, error) {
 	q := `
@@ -16,33 +30,12 @@ func GetRawTests(db *sqlx.DB) ([]pingr.GenericTest, error) {
 	return tests, err
 }
 
-func GetTests(db *sqlx.DB) ([]pingr.Test, error) {
-	tests, err := GetRawTests(db)
-	if err != nil {
-		return nil, err
-	}
-	var parsedTests []pingr.Test
-	for _, j := range tests {
-		pTest, err := j.Impl()
-		if err != nil {
-			return nil, err
-		}
-		parsedTests = append(parsedTests, pTest)
-	}
-
-	return parsedTests, nil
-}
-
 func GetRawTest(id string, db *sqlx.DB) (test pingr.GenericTest, err error) {
 	q := `
 		SELECT * FROM tests 
 		WHERE test_id = $1
 	`
 	err = db.Get(&test, q, id)
-	if err != nil {
-		return
-	}
-
 	return
 }
 
@@ -55,20 +48,17 @@ func GetTest(id string, db *sqlx.DB) (test pingr.Test, err error) {
 	return
 }
 
+
 func PostTest(test pingr.GenericTest, db *sqlx.DB) error {
 	q := `
-		INSERT INTO tests(test_id, test_name, test_type, url, interval, timeout, created_at, blob) 
-		VALUES (:test_id,:test_name,:test_type,:url,:interval,:timeout,:created_at,:blob);
+		INSERT INTO tests(test_id, test_name, test_type, url, interval, timeout, created_at, active, blob) 
+		VALUES (:test_id,:test_name,:test_type,:url,:interval,:timeout,:created_at,:active,:blob);
 	`
 	_, err := db.NamedExec(q, test)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
-func PutTest(test pingr.GenericTest,  db *sqlx.DB)  error {
+func PutTest(test pingr.GenericTest, db *sqlx.DB) error {
 	q := `
 		UPDATE tests 
 		SET test_name = :test_name,
@@ -77,102 +67,72 @@ func PutTest(test pingr.GenericTest,  db *sqlx.DB)  error {
 			interval = :interval,
 		    timeout = :timeout,
 			created_at = :created_at,
+		    active = :active,
 			blob = :blob
 		WHERE test_id = :test_id
 	`
 	_, err := db.NamedExec(q, test)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
-func DeleteTest(id string,  db *sqlx.DB) error {
+func DeleteTest(id string, db *sqlx.DB) error {
 	q := `
 		DELETE FROM tests 
 		WHERE test_id = $1
 	`
 	_, err := db.Exec(q, id)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
-/*
-func (j Test) Parse() (parsedTest pingr.Test, err error) {
-	switch j.TestType {
-	case "SSH":
-		var t pingr.SSHTest
-		t.BaseTest = j.BaseTest
-		err = json.Unmarshal(j.Blob, &t)
-		if err != nil {
-			return
-		}
-		parsedTest = t
-	case "TCP":
-		var t pingr.TCPTest
-		t.BaseTest = j.BaseTest
-		err = json.Unmarshal(j.Blob, &t)
-		if err != nil {
-			return
-		}
-		parsedTest = t
-	case "TLS":
-		var t pingr.TLSTest
-		t.BaseTest = j.BaseTest
-		err = json.Unmarshal(j.Blob, &t)
-		if err != nil {
-			return
-		}
-		parsedTest = t
-	case "Ping":
-		var t pingr.PingTest
-		t.BaseTest = j.BaseTest
-		parsedTest = t
-	case "HTTP":
-		var t pingr.HTTPTest
-		t.BaseTest = j.BaseTest
-		err = json.Unmarshal(j.Blob, &t)
-		if err != nil {
-			return
-		}
-		parsedTest = t
-	case "DNS":
-		var t pingr.DNSTest
-		t.BaseTest = j.BaseTest
-		err = json.Unmarshal(j.Blob, &t)
-		if err != nil {
-			return
-		}
-		parsedTest = t
-	case "Prometheus":
-		var t pingr.PrometheusTest
-		t.BaseTest = j.BaseTest
-		err = json.Unmarshal(j.Blob, &t)
-		if err != nil {
-			return
-		}
-		parsedTest = t
-	case "PrometheusPush":
-		var t pingr.PrometheusPushTest
-		t.BaseTest = j.BaseTest
-		err = json.Unmarshal(j.Blob, &t)
-		if err != nil {
-			return
-		}
-		parsedTest = t
-	case "HTTPPush":
-		var t pingr.HTTPPushTest
-		t.BaseTest = j.BaseTest
-		err = json.Unmarshal(j.Blob, &t)
-		if err != nil {
-			return
-		}
-		parsedTest = t
-	default:
-		err = errors.New(j.TestType + " is not a valid test type")
+
+
+func GetTestStatus(id string, db *sqlx.DB) (FullTestStatus, error) {
+	q := `
+		SELECT t.*, l2.status_id
+		FROM tests t
+		INNER JOIN logs l2 ON l2.log_id IN (
+		SELECT l1.log_id FROM logs l1 WHERE l1.test_id = t.test_id ORDER BY l1.created_at DESC LIMIT 1)
+		WHERE t.test_id = $1
+	`
+	var testStatus FullTestStatus
+	err := db.Get(&testStatus, q, id)
+	return testStatus, err
+}
+
+func GetTestsStatus(db *sqlx.DB) ([]TestStatus, error) {
+	q := `
+		SELECT t.test_id, t.test_name, t.test_type, t.active, t.url, l2.status_id, l2.response_time
+		FROM tests t
+		INNER JOIN logs l2 ON l2.log_id IN (
+		SELECT l1.log_id FROM logs l1 WHERE l1.test_id = t.test_id ORDER BY l1.created_at DESC LIMIT 1)
+		ORDER BY t.test_name
+	`
+	var testStatus []TestStatus
+	err := db.Select(&testStatus, q)
+	if err != nil {
+		return nil, err
 	}
-	return
-}*/
+	return testStatus, nil
+
+}
+
+func DeactivateTest(testId string, db *sqlx.DB) error {
+	q := `
+		UPDATE tests
+		SET active = 0
+		WHERE test_id = $1
+	`
+	_, err := db.Exec(q, testId)
+
+	return err
+}
+
+func ActivateTest(testId string, db *sqlx.DB) error {
+	q := `
+		UPDATE tests
+		SET active = 1
+		WHERE test_id = $1
+	`
+	_, err := db.Exec(q, testId)
+
+	return err
+}

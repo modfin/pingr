@@ -9,59 +9,81 @@ import (
 	"pingr"
 	"pingr/internal/bus"
 	"pingr/internal/dao"
-	"pingr/internal/sec"
 	"time"
 )
 
 func Init(g *echo.Group, buz *bus.Bus) {
 	// Get all Tests
-	g.GET("", func(context echo.Context) error {
-		db := context.Get("DB").(*sqlx.DB)
+	g.GET("", func(c echo.Context) error {
+		db := c.Get("DB").(*sqlx.DB)
 
-		tests, err := dao.GetTests(db)
+		tests, err := dao.GetRawTests(db)
 		if err != nil {
-			return context.String(500, "Failed to get test, :"+err.Error())
+			return c.String(500, "Failed to get test: "+err.Error())
 		}
 
-		return context.JSON(200, tests)
+		for i, _ := range tests {
+			err = tests[i].MaskSensitiveInfo(pingr.GET, nil)
+			if err != nil {
+				return c.String(500, "could not mask sensitive test data: "+err.Error())
+			}
+		}
+
+		return c.JSON(200, tests)
 	})
 
 	// Get a Test
-	g.GET("/:testId", func(context echo.Context) error {
-		db := context.Get("DB").(*sqlx.DB)
-		testId := context.Param("testId")
+	g.GET("/:testId", func(c echo.Context) error {
+		db := c.Get("DB").(*sqlx.DB)
+		testId := c.Param("testId")
 
-		test, err := dao.GetTest(testId, db)
+		test, err := dao.GetTestStatus(testId, db)
 		if err != nil {
-			return context.String(500, "Failed to get test, "+err.Error())
+			return c.String(500, "Failed to get test, "+err.Error())
 		}
 
-		return context.JSON(200, test)
+		err = test.MaskSensitiveInfo(pingr.GET, nil)
+		if err != nil {
+			return c.String(500, "Failed to mask test data: "+err.Error())
+		}
+
+		return c.JSON(200, test)
+	})
+
+	g.GET("/status", func(c echo.Context) error {
+		db := c.Get("DB").(*sqlx.DB)
+
+		testStatus, err := dao.GetTestsStatus(db)
+		if err != nil {
+			return c.String(500, "Failed to get test, "+err.Error())
+		}
+
+		return c.JSON(200, testStatus)
 	})
 
 	// Get a Test's Logs
-	g.GET("/:testId/logs", func(context echo.Context) error {
-		db := context.Get("DB").(*sqlx.DB)
-		testId := context.Param("testId")
+	g.GET("/:testId/logs", func(c echo.Context) error {
+		db := c.Get("DB").(*sqlx.DB)
+		testId := c.Param("testId")
 
 		logs, err := dao.GetTestLogs(testId, db)
 		if err != nil {
-			return context.String(500, "Failed to get the test's logs, "+err.Error())
+			return c.String(500, "Failed to get the test's logs, "+err.Error())
 		}
-		return context.JSON(200, logs)
+		return c.JSON(200, logs)
 	})
 
 	// Get a Test's Logs limited
-	g.GET("/:testId/logs/:days", func(context echo.Context) error {
-		db := context.Get("DB").(*sqlx.DB)
-		testId := context.Param("testId")
-		days := context.Param("days")
+	g.GET("/:testId/logs/:days", func(c echo.Context) error {
+		db := c.Get("DB").(*sqlx.DB)
+		testId := c.Param("testId")
+		days := c.Param("days")
 
 		logs, err := dao.GetTestLogsDaysLimited(testId, days, db)
 		if err != nil {
-			return context.String(500, "Failed to get the test's logs, "+err.Error())
+			return c.String(500, "Failed to get the test's logs, "+err.Error())
 		}
-		return context.JSON(200, logs)
+		return c.JSON(200, logs)
 	})
 
 	// Add new Test
@@ -78,51 +100,13 @@ func Init(g *echo.Group, buz *bus.Bus) {
 			return c.String(400, "invalid input: Test")
 		}
 
-		if testDB.SensitiveTest() {
-			switch testDB.TestType {
-			case "SSH":
-				var sshTest pingr.SSHTest
-				body, err := json.Marshal(testDB)
-				if err != nil {
-					return c.String(400, "could not read body: "+err.Error())
-				}
-				err = json.Unmarshal(body, &sshTest)
-				if err != nil {
-					return c.String(400, "could not unmarchal body: " + err.Error())
-				}
-				var encrypted string
-				switch sshTest.Blob.CredentialType {
-				case "userpass":
-					user := sec.User{
-						Password: sshTest.Blob.Credential,
-					}
-					err = user.Seal()
-					if err != nil {
-						return c.String(400, "could not seal ssh credentials: "+err.Error())
-					}
-					encrypted = user.Ciphertext
-				case "key":
-					key := sec.SSHKey{
-						PEM: sshTest.Blob.Credential,
-					}
-					err = key.Seal()
-					if err != nil {
-						return c.String(400, "could not seal ssh credentials: "+err.Error())
-					}
-					encrypted = key.Ciphertext
-				}
-				sshTest.Blob.Credential = encrypted
-				bytes, err := json.Marshal(sshTest.Blob)
-				if err != nil {
-					return c.String(400, "could not marshal sshTest.Blob: "+err.Error())
-				}
-				testDB.Blob = bytes
-			}
-
+		err := testDB.MaskSensitiveInfo(pingr.POST, nil)
+		if err != nil {
+			return c.String(400, "Could not mask sensitive test data: "+err.Error())
 		}
 
 		db := c.Get("DB").(*sqlx.DB)
-		err := dao.PostTest(testDB, db)
+		err = dao.PostTest(testDB, db)
 		if err != nil {
 			return c.String(500, "Could not add Test to DB, "+err.Error())
 		}
@@ -139,68 +123,126 @@ func Init(g *echo.Group, buz *bus.Bus) {
 		return c.JSON(200, testDB)
 	})
 
+	g.PUT("/:testId/deactivate", func(c echo.Context) error {
+		db := c.Get("DB").(*sqlx.DB)
+		testId := c.Param("testId")
+		err := dao.DeactivateTest(testId, db)
+		if err != nil {
+			return c.String(400, "could not deactivate test: " + err.Error())
+		}
+		err = buz.Publish("deactivate", []byte(testId))
+		if err != nil {
+			return c.String(400, "could not publish deactivation: " + err.Error())
+		}
+
+		return c.String(200, "test paused")
+	})
+
+	g.PUT("/:testId/activate", func(c echo.Context) error {
+		db := c.Get("DB").(*sqlx.DB)
+		testId := c.Param("testId")
+
+		test, err := dao.GetRawTest(testId, db)
+		if err != nil {
+			return c.String(400, "invalid test id: " + err.Error())
+		}
+
+		err = dao.ActivateTest(testId, db)
+		if err != nil {
+			return c.String(400, "could not activate test: " + err.Error())
+		}
+
+		data, err := json.Marshal(test)
+		if err != nil {
+			return c.String(500, fmt.Sprintf("could not marchal test: %s", err.Error()))
+		}
+		err = buz.Publish("new", data)
+		if err != nil {
+			return c.String(400, "could not publish activation: " + err.Error())
+		}
+
+		return c.String(200, "test activated")
+	})
+
 	// Update Test
-	g.PUT("", func(context echo.Context) error {
+	g.PUT("", func(c echo.Context) error {
 		var testDB pingr.GenericTest
-		if err := context.Bind(&testDB); err != nil {
-			return context.String(400, "Could not parse body as test type")
+		if err := c.Bind(&testDB); err != nil {
+			return c.String(400, "Could not parse body as test type")
 		}
 
 		testDB.CreatedAt = time.Now()
 
-		if !testDB.Validate() {
-			return context.String(400, "invalid input: Test")
+		db := c.Get("DB").(*sqlx.DB)
+		testDb, err := dao.GetRawTest(testDB.TestId, db)
+		if err != nil {
+			return c.String(400, "Not a valid/active testId, "+err.Error())
 		}
 
-		db := context.Get("DB").(*sqlx.DB)
-		_, err := dao.GetTest(testDB.TestId, db)
+		err = testDB.MaskSensitiveInfo(pingr.PUT, &testDb)
 		if err != nil {
-			return context.String(400, "Not a valid/active testId, "+err.Error())
+			return c.String(400, "could not mask sensitive test data: "+err.Error())
+		}
+
+		if !testDB.Validate() {
+			return c.String(400, "invalid input: Test")
 		}
 
 		err = dao.PutTest(testDB, db)
 		if err != nil {
-			return context.String(500, "Could not update Test, "+err.Error())
+			return c.String(500, "Could not update Test, "+err.Error())
 		}
 
-		data, err := json.Marshal(testDB)
-		if err != nil {
-			return context.String(500, fmt.Sprintf("could not marchal test: %s", err.Error()))
-		}
-		err = buz.Publish("new", data)
-		if err != nil {
-			return context.String(500, fmt.Sprintf("unable to publish new test: %s", err.Error()))
+		if testDB.Active {
+			data, err := json.Marshal(testDB)
+			if err != nil {
+				return c.String(500, fmt.Sprintf("could not marchal test: %s", err.Error()))
+			}
+			err = buz.Publish("new", data)
+			if err != nil {
+				return c.String(500, fmt.Sprintf("unable to publish new test: %s", err.Error()))
+			}
 		}
 
-		return context.JSON(200, testDB)
+		return c.JSON(200, testDB)
 	})
 
 	// Delete Test
-	g.DELETE("/:testId", func(context echo.Context) error {
-		testId := context.Param("testId")
+	g.DELETE("/:testId", func(c echo.Context) error {
+		testId := c.Param("testId")
 
-		db := context.Get("DB").(*sqlx.DB)
+		db := c.Get("DB").(*sqlx.DB)
 		_, err := dao.GetTest(testId, db)
 		if err != nil {
-			return context.String(400, "Not a valid/active testId, "+err.Error())
+			return c.String(400, "Not a valid/active testId, "+err.Error())
 		}
 
 		err = dao.DeleteTest(testId, db)
 		if err != nil {
-			return context.String(500, "Could not delete Test, "+err.Error())
+			return c.String(500, "Could not delete Test, "+err.Error())
 		}
 
 		err = dao.DeleteTestContacts(testId, db)
 		if err != nil {
-			return context.String(500, "Could not delete the test's contacts: "+err.Error())
+			return c.String(500, "Could not delete the test's contacts: "+err.Error())
+		}
+
+		err = dao.DeleteTestLogs(testId, db)
+		if err != nil {
+			return c.String(500, "Could not delete the test's logs: "+err.Error())
+		}
+
+		err = dao.CloseTestIncident(testId, db)
+		if err != nil {
+			return c.String(500, "Could not close the test's incident: "+err.Error())
 		}
 
 		err = buz.Publish("delete", []byte(testId))
 		if err != nil {
-			return context.String(500, fmt.Sprintf("unable to publish deletion: %s", err.Error()))
+			return c.String(500, fmt.Sprintf("unable to publish deletion: %s", err.Error()))
 		}
 
-		return context.String(200, "Test deleted")
+		return c.String(200, "Test deleted")
 	})
 
 	g.POST("/test", func(c echo.Context) error {
@@ -220,52 +262,14 @@ func Init(g *echo.Group, buz *bus.Bus) {
 			return c.String(400, "invalid input: Test")
 		}
 
-		if testDB.SensitiveTest() {
-			switch testDB.TestType {
-			case "SSH":
-				var sshTest pingr.SSHTest
-				body, err := json.Marshal(testDB)
-				if err != nil {
-					return c.String(400, "could not read body: "+err.Error())
-				}
-				err = json.Unmarshal(body, &sshTest)
-				if err != nil {
-					return c.String(400, "could not unmarchal body: " + err.Error())
-				}
-				var encrypted string
-				switch sshTest.Blob.CredentialType {
-				case "userpass":
-					user := sec.User{
-						Password: sshTest.Blob.Credential,
-					}
-					err = user.Seal()
-					if err != nil {
-						return c.String(400, "could not seal ssh credentials: "+err.Error())
-					}
-					encrypted = user.Ciphertext
-				case "key":
-					key := sec.SSHKey{
-						PEM: sshTest.Blob.Credential,
-					}
-					err = key.Seal()
-					if err != nil {
-						return c.String(400, "could not seal ssh credentials: "+err.Error())
-					}
-					encrypted = key.Ciphertext
-				}
-				sshTest.Blob.Credential = encrypted
-				bytes, err := json.Marshal(sshTest.Blob)
-				if err != nil {
-					return c.String(400, "could not marshal sshTest.Blob: "+err.Error())
-				}
-				testDB.Blob = bytes
-				pTest, err = testDB.Impl()
-				if err != nil {
-					return c.String(400, "Could not parse test data: "+err.Error())
-				}
+		err = testDB.MaskSensitiveInfo(pingr.POST, nil)
+		if err != nil {
+			return c.String(400, "Could not mask sensitive test data: "+err.Error())
+		}
 
-			}
-
+		pTest, err = testDB.Impl()
+		if err != nil {
+			return c.String(400, "Could not parse test data: "+err.Error())
 		}
 
 		rt, err := pTest.RunTest(buz)
