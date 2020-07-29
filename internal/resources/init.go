@@ -83,7 +83,7 @@ func Init(closing <-chan struct{}, db *sqlx.DB, buz *bus.Bus) {
 			return err
 		}
 		return c.Blob(200, http.DetectContentType(data), data)
-	})
+	}, basicAuth)
 
 	go e.Start(fmt.Sprintf(":%d", config.Get().Port))
 
