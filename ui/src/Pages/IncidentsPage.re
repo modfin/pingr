@@ -142,86 +142,91 @@ let make = () => {
                  {"Closed" |> React.string}
                </p>
                <table className="w-full text-left">
-                 <thead className="flex w-full">
-                   <tr className="flex w-full">
-                     <td className="font-bold px-4 py-2 lg:w-1/12 w-1/6">
-                       {"Test name" |> React.string}
-                     </td>
-                     <td className="font-bold px-4 py-2 lg:w-1/12 w-1/6">
-                       {"Details" |> React.string}
-                     </td>
-                     <td className="font-bold px-4 py-2 lg:w-1/2 w-1/3">
-                       {"Root cause" |> React.string}
-                     </td>
-                     <td className="font-bold px-4 py-2 w-1/6">
-                       {"Created" |> React.string}
-                     </td>
-                     <td className="font-bold px-4 py-2 w-1/6">
-                       {"Closed" |> React.string}
-                     </td>
-                   </tr>
-                 </thead>
-                 <tbody>
-                   {let closed =
-                      incidents
-                      |> List.filter(incident => !incident.active)
-                      |> Array.of_list;
-                    Array.length(closed) != 0
-                      ? closed
-                        |> Belt.Array.slice(
-                             ~offset=page * incidentsPerPage,
-                             ~len=incidentsPerPage,
-                           )
-                        |> Array.map(incident => {
-                             <tr
-                               key={string_of_int(incident.incidentId)}
-                               className="w-full flex">
-                               <td
-                                 className="border px-4 py-2 w-1/6 lg:w-1/12">
-                                 <a
-                                   className="no-underline text-blue-500 hover:underline cursor-pointer"
-                                   onClick={_event =>
-                                     Paths.goToTest(incident.testId)
-                                   }>
-                                   {incident.testName |> React.string}
-                                 </a>
-                               </td>
-                               <td
-                                 className="border px-4 py-2 w-1/6 lg:w-1/12">
-                                 <a
-                                   className="no-underline text-blue-500 hover:underline cursor-pointer"
-                                   onClick={_event =>
-                                     Paths.goToIncident(
-                                       string_of_int(incident.incidentId),
-                                     )
-                                   }>
-                                   {"View" |> React.string}
-                                 </a>
-                               </td>
-                               <td className="border px-4 py-2 lg:w-1/2 w-1/3">
-                                 {incident.rootCause |> React.string}
-                               </td>
-                               <td className="border px-4 py-2 w-1/6">
-                                 {incident.createdAt
-                                  |> Js.Date.fromString
-                                  |> Js.Date.toLocaleString
-                                  |> React.string}
-                               </td>
-                               <td className="border px-4 py-2 w-1/6">
-                                 {incident.closedAt
-                                  |> Js.Date.fromString
-                                  |> Js.Date.toLocaleString
-                                  |> React.string}
-                               </td>
-                             </tr>
-                           })
-                        |> React.array
-                      : <tr>
-                          <td className="py-2 italic">
-                            {"No closed incidents" |> React.string}
-                          </td>
-                        </tr>}
-                 </tbody>
+                 {let closed =
+                    incidents
+                    |> List.filter(incident => !incident.active)
+                    |> Array.of_list;
+                  Array.length(closed) != 0
+                    ? <>
+                        <thead className="flex w-full">
+                          <tr className="flex w-full">
+                            <td
+                              className="font-bold px-4 py-2 lg:w-1/12 w-1/6">
+                              {"Test name" |> React.string}
+                            </td>
+                            <td
+                              className="font-bold px-4 py-2 lg:w-1/12 w-1/6">
+                              {"Details" |> React.string}
+                            </td>
+                            <td className="font-bold px-4 py-2 lg:w-1/2 w-1/3">
+                              {"Root cause" |> React.string}
+                            </td>
+                            <td className="font-bold px-4 py-2 w-1/6">
+                              {"Created" |> React.string}
+                            </td>
+                            <td className="font-bold px-4 py-2 w-1/6">
+                              {"Closed" |> React.string}
+                            </td>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {closed
+                           |> Belt.Array.slice(
+                                ~offset=page * incidentsPerPage,
+                                ~len=incidentsPerPage,
+                              )
+                           |> Array.map(incident => {
+                                <tr
+                                  key={string_of_int(incident.incidentId)}
+                                  className="w-full flex">
+                                  <td
+                                    className="border px-4 py-2 w-1/6 lg:w-1/12">
+                                    <a
+                                      className="no-underline text-blue-500 hover:underline cursor-pointer"
+                                      onClick={_event =>
+                                        Paths.goToTest(incident.testId)
+                                      }>
+                                      {incident.testName |> React.string}
+                                    </a>
+                                  </td>
+                                  <td
+                                    className="border px-4 py-2 w-1/6 lg:w-1/12">
+                                    <a
+                                      className="no-underline text-blue-500 hover:underline cursor-pointer"
+                                      onClick={_event =>
+                                        Paths.goToIncident(
+                                          string_of_int(incident.incidentId),
+                                        )
+                                      }>
+                                      {"View" |> React.string}
+                                    </a>
+                                  </td>
+                                  <td
+                                    className="border px-4 py-2 lg:w-1/2 w-1/3">
+                                    {incident.rootCause |> React.string}
+                                  </td>
+                                  <td className="border px-4 py-2 w-1/6">
+                                    {incident.createdAt
+                                     |> Js.Date.fromString
+                                     |> Js.Date.toLocaleString
+                                     |> React.string}
+                                  </td>
+                                  <td className="border px-4 py-2 w-1/6">
+                                    {incident.closedAt
+                                     |> Js.Date.fromString
+                                     |> Js.Date.toLocaleString
+                                     |> React.string}
+                                  </td>
+                                </tr>
+                              })
+                           |> React.array}
+                        </tbody>
+                      </>
+                    : <tr>
+                        <td className="py-2 italic">
+                          {"No closed incidents" |> React.string}
+                        </td>
+                      </tr>}
                </table>
                {List.length(incidents) > incidentsPerPage
                   ? <ul className="flex list-reset mt-1">
