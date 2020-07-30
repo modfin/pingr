@@ -1,14 +1,3 @@
-type testTypes =
-  | HTTP
-  | Prometheus
-  | TLS
-  | DNS
-  | Ping
-  | SSH
-  | TCP
-  | HTTPPush
-  | PrometheusPush;
-
 module Loadable = {
   type t('result) =
     | Loading
@@ -30,6 +19,7 @@ type testState =
 [@react.component]
 let make = (~id) => {
   let (showData, setShowData) = React.useState(_ => false);
+  let (errorMsg, setErrorMsg) = React.useState(() => "");
 
   let (state, dispatch) =
     React.useReducer(
@@ -56,8 +46,6 @@ let make = (~id) => {
     },
     [|state|],
   );
-
-  let (errorMsg, setErrorMsg) = React.useState(() => "");
 
   let handleActiveChange = value => {
     Api.updateActive(id, value, result => {
@@ -103,51 +91,17 @@ let make = (~id) => {
       <Divider title={"Test: " ++ test.testName}>
         <div className="flex">
           <b> {"Status: " |> React.string} </b>
-          {switch (test.active, test.statusId) {
-           | (false, _) =>
-             <div className="w-4 h-4 rounded bg-gray-500 tooltip mt-1 ml-1">
-               <span
-                 className="tooltip-text bg-gray-400 border text-black -mt-12">
-                 {"Paused" |> React.string}
-               </span>
-             </div>
-
-           | (true, Some(1)) =>
-             <div className="w-4 h-4 rounded bg-green-500 tooltip mt-1 ml-1">
-               <span
-                 className="tooltip-text bg-gray-400 border text-black -mt-12">
-                 {"Success" |> React.string}
-               </span>
-             </div>
-           | (true, Some(2)) =>
-             <div className="w-4 h-4 rounded bg-red-500 tooltip mt-1 ml-1">
-               <span
-                 className="tooltip-text bg-gray-400 border text-black -mt-12">
-                 {"Error" |> React.string}
-               </span>
-             </div>
-           | (true, Some(3)) =>
-             <div className="w-4 h-4 rounded bg-red-500 tooltip mt-1 ml-1">
-               <span
-                 className="tooltip-text bg-gray-400 border text-black -mt-12">
-                 {"Timed out" |> React.string}
-               </span>
-             </div>
-           | (true, Some(5)) =>
-             <div className="w-4 h-4 rounded bg-yellow-500 tooltip mt-1 ml-1">
-               <span
-                 className="tooltip-text bg-gray-400 border text-black -mt-12">
-                 {"Initialized" |> React.string}
-               </span>
-             </div>
-           | _ =>
-             <div className="w-4 h-4 rounded bg-gray-500 tooltip mt-1 ml-1">
-               <span
-                 className="tooltip-text bg-gray-400 border text-black -mt-12">
-                 {"Unknown status" |> React.string}
-               </span>
-             </div>
-           }}
+          <div className="mt-1 ml-1">
+            <TestStatusLabel
+              active={test.active}
+              statusId={
+                switch (test.statusId) {
+                | None => 0
+                | Some(i) => i
+                }
+              }
+            />
+          </div>
         </div>
         <p>
           {<b> {"Url: " |> React.string} </b>}

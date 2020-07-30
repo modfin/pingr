@@ -1,4 +1,4 @@
-type responseJson =
+type response =
   | Success(string)
   | SuccessJSON(Js.Json.t)
   | Error(string);
@@ -145,11 +145,11 @@ let fetchJSONResponse = res => {
 let fetchTextResponse = res => {
   Fetch.Response.ok(res)
     ? Fetch.Response.text(res)
-    : Js.Exn.raiseError(Fetch.Response.statusText(res));
+    : Fetch.Response.text(res)
+      |> Js.Promise.then_(res => Js.Exn.raiseError(res) |> Js.Promise.reject);
 };
 
-let postTest = (payload, callback) => {
-  let path = p ++ "/tests";
+let postWithJsonResponse = (path, payload, callback) => {
   Js.Promise.(
     JsonTransport.post(path, payload)
     |> then_(res => res |> fetchJSONResponse)
@@ -159,8 +159,17 @@ let postTest = (payload, callback) => {
   );
 };
 
-let putTest = (payload, callback) => {
-  let path = p ++ "/tests";
+let postWithTextResponse = (path, payload, callback) => {
+  Js.Promise.(
+    JsonTransport.post(path, payload)
+    |> then_(res => res |> fetchTextResponse)
+    |> then_(response => callback(Success(response)) |> resolve)
+    |> catch(e => callback(Error([%bs.raw "e.message"])) |> resolve)
+    |> ignore
+  );
+};
+
+let putWithJsonResponse = (path, payload, callback) => {
   Js.Promise.(
     JsonTransport.put(path, payload)
     |> then_(res => res |> fetchJSONResponse)
@@ -170,8 +179,17 @@ let putTest = (payload, callback) => {
   );
 };
 
-let deleteTest = (id, callback) => {
-  let path = p ++ "/tests/" ++ id;
+let putWithTextResponse = (path, payload, callback) => {
+  Js.Promise.(
+    JsonTransport.put(path, payload)
+    |> then_(res => res |> fetchTextResponse)
+    |> then_(response => callback(Success(response)) |> resolve)
+    |> catch(e => callback(Error([%bs.raw "e.message"])) |> resolve)
+    |> ignore
+  );
+};
+
+let deleteWithTextResponse = (path, callback) => {
   Js.Promise.(
     JsonTransport.delete(path)
     |> then_(res => res |> fetchTextResponse)
@@ -181,15 +199,24 @@ let deleteTest = (id, callback) => {
   );
 };
 
+let postTest = (payload, callback) => {
+  let path = p ++ "/tests";
+  postWithJsonResponse(path, payload, callback);
+};
+
+let putTest = (payload, callback) => {
+  let path = p ++ "/tests";
+  putWithJsonResponse(path, payload, callback);
+};
+
+let deleteTest = (id, callback) => {
+  let path = p ++ "/tests/" ++ id;
+  deleteWithTextResponse(path, callback);
+};
+
 let tryTest = (payload, callback) => {
   let path = p ++ "/tests/test";
-  Js.Promise.(
-    JsonTransport.post(path, payload)
-    |> then_(res => res |> fetchTextResponse)
-    |> then_(response => callback(Success(response)) |> resolve)
-    |> catch(e => callback(Error([%bs.raw "e.message"])) |> resolve)
-    |> ignore
-  );
+  postWithTextResponse(path, payload, callback);
 };
 
 let updateActive = (testId, value, callback) => {
@@ -201,77 +228,35 @@ let updateActive = (testId, value, callback) => {
     ++ {
       value ? "activate" : "deactivate";
     };
-  Js.Promise.(
-    JsonTransport.put(path, Js.Dict.empty())
-    |> then_(res => res |> fetchTextResponse)
-    |> then_(response => callback(Success(response)) |> resolve)
-    |> catch(e => callback(Error([%bs.raw "e.message"])) |> resolve)
-    |> ignore
-  );
+  putWithTextResponse(path, Js.Dict.empty(), callback);
 };
 
 let postContact = (payload, callback) => {
   let path = p ++ "/contacts";
-  Js.Promise.(
-    JsonTransport.post(path, payload)
-    |> then_(res => res |> fetchTextResponse)
-    |> then_(response => callback(Success(response)) |> resolve)
-    |> catch(e => callback(Error([%bs.raw "e.message"])) |> resolve)
-    |> ignore
-  );
+  postWithTextResponse(path, payload, callback);
 };
 
 let putContact = (payload, callback) => {
   let path = p ++ "/contacts";
-  Js.Promise.(
-    JsonTransport.put(path, payload)
-    |> then_(res => res |> fetchTextResponse)
-    |> then_(response => callback(Success(response)) |> resolve)
-    |> catch(e => callback(Error([%bs.raw "e.message"])) |> resolve)
-    |> ignore
-  );
+  putWithTextResponse(path, payload, callback);
 };
 
 let deleteContact = (id, callback) => {
   let path = p ++ "/contacts/" ++ id;
-  Js.Promise.(
-    JsonTransport.delete(path)
-    |> then_(res => res |> fetchTextResponse)
-    |> then_(response => callback(Success(response)) |> resolve)
-    |> catch(e => callback(Error([%bs.raw "e.message"])) |> resolve)
-    |> ignore
-  );
+  deleteWithTextResponse(path, callback);
 };
 
 let tryContact = (payload, callback) => {
   let path = p ++ "/contacts/test";
-  Js.Promise.(
-    JsonTransport.post(path, payload)
-    |> then_(res => res |> fetchTextResponse)
-    |> then_(response => callback(Success(response)) |> resolve)
-    |> catch(e => callback(Error([%bs.raw "e.message"])) |> resolve)
-    |> ignore
-  );
+  postWithTextResponse(path, payload, callback);
 };
 
 let postTestContacts = (payload, callback) => {
   let path = p ++ "/testcontacts";
-  Js.Promise.(
-    JsonTransport.post(path, payload)
-    |> then_(res => res |> fetchTextResponse)
-    |> then_(response => callback(Success(response)) |> resolve)
-    |> catch(e => callback(Error([%bs.raw "e.message"])) |> resolve)
-    |> ignore
-  );
+  postWithTextResponse(path, payload, callback);
 };
 
 let putTestContacts = (payload, callback) => {
   let path = p ++ "/testcontacts";
-  Js.Promise.(
-    JsonTransport.put(path, payload)
-    |> then_(res => res |> fetchTextResponse)
-    |> then_(response => callback(Success(response)) |> resolve)
-    |> catch(e => callback(Error([%bs.raw "e.message"])) |> resolve)
-    |> ignore
-  );
+  putWithTextResponse(path, payload, callback);
 };

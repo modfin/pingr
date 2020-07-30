@@ -11,12 +11,7 @@ type action =
   | LoadSuccessContacts(list(Models.TestContact.t))
   | LoadFailTest(string)
   | LoadFailContacts(string);
-/*
- type testState =
-   | Loading
-   | Success(Models.Test.t)
-   | Failure;
- */
+
 type state = {
   test: Loadable.t(Models.Test.t),
   testContacts: Loadable.t(list(Models.TestContact.t)),
@@ -50,10 +45,6 @@ let make = (~id) => {
       | Some(test) => dispatch(LoadSuccessTest(test))
       }
     );
-    None;
-  });
-
-  React.useEffect0(() => {
     Api.fetchTestContactsWithCallback(id, result =>
       switch (result) {
       | None => dispatch(LoadFailContacts("Not working"))
@@ -62,6 +53,7 @@ let make = (~id) => {
     );
     None;
   });
+
   switch (state) {
   | {test: Loading, testContacts: _} =>
     <div> {ReasonReact.string("Loading...")} </div>

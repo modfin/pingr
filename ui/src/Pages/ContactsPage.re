@@ -1,14 +1,3 @@
-type testTypes =
-  | HTTP
-  | Prometheus
-  | TLS
-  | DNS
-  | Ping
-  | SSH
-  | TCP
-  | HTTPPush
-  | PrometheusPush;
-
 module Loadable = {
   type t('result) =
     | Loading

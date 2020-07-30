@@ -47,7 +47,7 @@ func Init(closing <-chan struct{}, db *sqlx.DB, buz *bus.Bus) {
 	e.Use(middleware.Recover())
 
 	health.SetMetrics(e)
-	health.Init(closing, e.Group("api/health", basicAuth))
+	health.Init(closing, e.Group("api/health"))
 
 	tests.Init(e.Group("api/tests", basicAuth), buz)
 	logs.Init(e.Group("api/logs", basicAuth))

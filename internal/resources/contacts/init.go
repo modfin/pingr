@@ -120,12 +120,12 @@ func Init(g *echo.Group) {
 		case "smtp":
 			 err := notifications.SendEmail([]string{contact.ContactUrl}, testTest, testError, c.Get("DB").(*sqlx.DB))
 			 if err != nil {
-			 	return c.String(500, "an error occurred during the test: " + err.Error())
+			 	return c.String(400, "an error occurred during the test: " + err.Error())
 			 }
 		case "http":
 			err := notifications.PostHook([]string{contact.ContactUrl}, testTest, testError, 3)
 			if err != nil {
-				return c.String(500, "an error occurred during the test: " + err.Error())
+				return c.String(400, "an error occurred during the test: " + err.Error())
 			}
 		}
 		return c.String(200, "your test ran without error, notifications sent, check your contact url")

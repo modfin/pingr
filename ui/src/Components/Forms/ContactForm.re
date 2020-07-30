@@ -84,7 +84,9 @@ let make = (~submitContact, ~inputContact: option(Models.Contact.t)=?) => {
 
   let testContactCallback = resp => {
     switch (resp) {
-    | Api.Error(msg) => setErrorMsg(_ => msg)
+    | Api.Error(msg) =>
+      setErrorMsg(_ => msg);
+      setTryTestMsg(_ => "");
     | Api.Success(msg) => setTryTestMsg(_ => msg)
     | Api.SuccessJSON(_) => Paths.goToContacts()
     };
@@ -252,12 +254,12 @@ let make = (~submitContact, ~inputContact: option(Models.Contact.t)=?) => {
             {"Submit" |> React.string}
           </button>
           {tryTestMsg != ""
-             ? <p className="text-gray-600 m-1">
+             ? <p className="text-gray-600 mt-1">
                  {tryTestMsg |> React.string}
                </p>
              : React.null}
           {errorMsg != ""
-             ? <p className="text-red-500 text-xs italic m-1">
+             ? <p className="text-red-500 text-xs mt-1">
                  {"Error posting contact: " ++ errorMsg |> React.string}
                </p>
              : React.null}
