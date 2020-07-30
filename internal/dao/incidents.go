@@ -17,7 +17,7 @@ type IncidentContactLogWithName struct {
 }
 
 type IncidentFull struct {
-	Incident IncidentWithTestName `json:"incident"`
+	Incident   IncidentWithTestName         `json:"incident"`
 	ContactLog []IncidentContactLogWithName `json:"contact_log"`
 }
 
@@ -30,7 +30,7 @@ func GetIncident(id string, db *sqlx.DB) (IncidentFull, error) {
 `
 	var incident IncidentFull
 	err := db.Get(&incident.Incident, q, id)
-	if err != nil{
+	if err != nil {
 		return incident, err
 	}
 	q2 := `

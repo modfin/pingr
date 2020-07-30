@@ -11,7 +11,7 @@ func Init(g *echo.Group) {
 		db := c.Get("DB").(*sqlx.DB)
 		incidents, err := dao.GetIncidents(db)
 		if err != nil {
-			return c.String(500, "could not get incidents: " + err.Error())
+			return c.String(500, "could not get incidents: "+err.Error())
 		}
 		return c.JSON(200, incidents)
 	})
@@ -22,7 +22,7 @@ func Init(g *echo.Group) {
 
 		incidents, err := dao.GetIncident(incidentId, db)
 		if err != nil {
-			return c.String(500, "could not get incidents: " + err.Error())
+			return c.String(500, "could not get incidents: "+err.Error())
 		}
 		return c.JSON(200, incidents)
 	})

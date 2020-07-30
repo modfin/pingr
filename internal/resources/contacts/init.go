@@ -16,7 +16,7 @@ func Init(g *echo.Group) {
 		db := context.Get("DB").(*sqlx.DB)
 		contacts, err := dao.GetContacts(db)
 		if err != nil {
-			return context.String(500, "Failed to get contacts, :" +  err.Error())
+			return context.String(500, "Failed to get contacts, :"+err.Error())
 		}
 
 		return context.JSON(200, contacts)
@@ -24,20 +24,20 @@ func Init(g *echo.Group) {
 
 	g.GET("/:contactId", func(context echo.Context) error {
 		db := context.Get("DB").(*sqlx.DB)
-		contactId:= context.Param("contactId")
+		contactId := context.Param("contactId")
 
 		contact, err := dao.GetContact(contactId, db)
 		if err != nil {
-			return context.String(500, "Failed to get contact, :" +  err.Error())
+			return context.String(500, "Failed to get contact, :"+err.Error())
 		}
 
 		return context.JSON(200, contact)
 	})
 
-	g.POST("",func(context echo.Context) error {
+	g.POST("", func(context echo.Context) error {
 		var contact pingr.Contact
 		if err := context.Bind(&contact); err != nil {
-			return context.String(400, "Could not parse body as contact type: " + err.Error())
+			return context.String(400, "Could not parse body as contact type: "+err.Error())
 		}
 		contact.ContactId = uuid.New().String()
 		if !contact.Validate() {
@@ -48,7 +48,7 @@ func Init(g *echo.Group) {
 		db := context.Get("DB").(*sqlx.DB)
 		err := dao.PostContact(contact, db)
 		if err != nil {
-			return context.String(500, "could not add contact to db: " + err.Error())
+			return context.String(500, "could not add contact to db: "+err.Error())
 		}
 
 		return context.String(200, "contact added to db")
@@ -57,7 +57,7 @@ func Init(g *echo.Group) {
 	g.PUT("", func(context echo.Context) error {
 		var contact pingr.Contact
 		if err := context.Bind(&contact); err != nil {
-			return context.String(400, "Could not parse body as contact type: " + err.Error())
+			return context.String(400, "Could not parse body as contact type: "+err.Error())
 		}
 		if !contact.Validate() {
 			return context.String(400, "invalid input: Contact")
@@ -66,7 +66,7 @@ func Init(g *echo.Group) {
 		db := context.Get("DB").(*sqlx.DB)
 		_, err := dao.GetContact(contact.ContactId, db)
 		if err != nil {
-			return context.String(400, "Not a valid/active ContactId, " + err.Error())
+			return context.String(400, "Not a valid/active ContactId, "+err.Error())
 		}
 
 		err = dao.PutContact(contact, db)
@@ -78,17 +78,17 @@ func Init(g *echo.Group) {
 	})
 
 	g.DELETE("/:contactId", func(context echo.Context) error {
-		contactId:= context.Param("contactId")
+		contactId := context.Param("contactId")
 
 		db := context.Get("DB").(*sqlx.DB)
 		_, err := dao.GetContact(contactId, db)
 		if err != nil {
-			return context.String(400, "Not a valid/active contactId, " + err.Error())
+			return context.String(400, "Not a valid/active contactId, "+err.Error())
 		}
 
 		err = dao.DeleteContact(contactId, db)
 		if err != nil {
-			return context.String(500, "Could not delete contact, " + err.Error())
+			return context.String(500, "Could not delete contact, "+err.Error())
 		}
 
 		return context.String(200, "contact deleted")
@@ -97,7 +97,7 @@ func Init(g *echo.Group) {
 	g.POST("/test", func(c echo.Context) error {
 		var contact pingr.Contact
 		if err := c.Bind(&contact); err != nil {
-			return c.String(400, "Could not parse body as contact type: " + err.Error())
+			return c.String(400, "Could not parse body as contact type: "+err.Error())
 		}
 		contact.ContactId = uuid.New().String()
 		if !contact.Validate() {
@@ -118,14 +118,14 @@ func Init(g *echo.Group) {
 
 		switch contact.ContactType {
 		case "smtp":
-			 err := notifications.SendEmail([]string{contact.ContactUrl}, testTest, testError, c.Get("DB").(*sqlx.DB))
-			 if err != nil {
-			 	return c.String(400, "an error occurred during the test: " + err.Error())
-			 }
+			err := notifications.SendEmail([]string{contact.ContactUrl}, testTest, testError, c.Get("DB").(*sqlx.DB))
+			if err != nil {
+				return c.String(400, "an error occurred during the test: "+err.Error())
+			}
 		case "http":
 			err := notifications.PostHook([]string{contact.ContactUrl}, testTest, testError, 3)
 			if err != nil {
-				return c.String(400, "an error occurred during the test: " + err.Error())
+				return c.String(400, "an error occurred during the test: "+err.Error())
 			}
 		}
 		return c.String(200, "your test ran without error, notifications sent, check your contact url")

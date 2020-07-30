@@ -142,12 +142,18 @@ let make = (~logs) => {
                      }}
                   </td>
                   <td className="border px-4 py-2 w-1/6">
-                    {React.string(
-                       log.responseTime
-                       |> float_of_int
-                       |> toMicroSeconds
-                       |> Js.Float.toFixedWithPrecision(~digits=1),
-                     )}
+                    {(
+                       switch (log.statusId) {
+                       | 5
+                       | 6 => "-"
+                       | _ =>
+                         log.responseTime
+                         |> float_of_int
+                         |> toMicroSeconds
+                         |> Js.Float.toFixedWithPrecision(~digits=1)
+                       }
+                     )
+                     |> React.string}
                   </td>
                   <td className="border px-4 py-2 w-5/12 lg:w-1/2">
                     {log.message |> React.string}

@@ -109,7 +109,10 @@ let make = (~id) => {
              switch (test.testType) {
              | "HTTPPush"
              | "PrometheusPush" =>
-               "/api/push/" ++ test.testId ++ "/" ++ test.testName
+               "/api/push/"
+               ++ test.testId
+               ++ "/"
+               ++ String.trim(test.testName)
              | _ => test.url
              }
            )
@@ -118,7 +121,7 @@ let make = (~id) => {
         <button
           type_="button"
           onClick={_e => handleActiveChange(!test.active)}
-          className="my-1 bg-teal-500 hover:bg-teal-700 text-white py-1 px-2 rounded">
+          className="my-1 bg-gray-500 hover:bg-gray-700 text-white py-1 px-2 rounded">
           {(test.active ? "Pause" : "Activate") |> React.string}
         </button>
         <button

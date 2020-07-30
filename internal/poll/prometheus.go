@@ -8,18 +8,15 @@ import (
 	"time"
 )
 
-
-
 var (
 	prevPromValues = make(map[string]float64)
-	mu sync.RWMutex
+	mu             sync.RWMutex
 )
-
 
 func Prometheus(testId string, url string, timeout time.Duration, metricTests []push.MetricTest) (time.Duration, error) {
 	start := time.Now()
 
-	client:= http.Client{
+	client := http.Client{
 		Timeout: timeout,
 	}
 

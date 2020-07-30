@@ -111,17 +111,24 @@ let make = () => {
                              "/api/push/"
                              ++ testStatus.testId
                              ++ "/"
-                             ++ testStatus.testName
+                             ++ String.escaped(testStatus.testName)
                            | _ => testStatus.url
                            }
                          )
                          |> React.string}
                       </td>
                       <td className="border px-4 py-2">
-                        {testStatus.responseTime
-                         |> float_of_int
-                         |> LogList.toMicroSeconds
-                         |> Js.Float.toFixedWithPrecision(~digits=1)
+                        {(
+                           switch (testStatus.active, testStatus.statusId) {
+                           | (false, _)
+                           | (true, 5) => "-"
+                           | _ =>
+                             testStatus.responseTime
+                             |> float_of_int
+                             |> LogList.toMicroSeconds
+                             |> Js.Float.toFixedWithPrecision(~digits=1)
+                           }
+                         )
                          |> React.string}
                       </td>
                     </tr>

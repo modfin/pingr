@@ -65,7 +65,7 @@ const (
 func DNS(resolvers []string, domain string, timeout time.Duration, record Record, strategy Strategy, check []string) (time.Duration, error) {
 	start := time.Now()
 
-	Loop:
+Loop:
 	for _, addr := range resolvers {
 		r := &net.Resolver{
 			PreferGo: true,
@@ -117,14 +117,13 @@ func DNS(resolvers []string, domain string, timeout time.Duration, record Record
 		}
 
 		var dnsSet = map[string]struct{}{}
-		for _, r := range res{
+		for _, r := range res {
 			dnsSet[r] = struct{}{}
 		}
 		var checkSet = map[string]struct{}{}
-		for _, r := range check{
+		for _, r := range check {
 			checkSet[r] = struct{}{}
 		}
-
 
 		switch strategy {
 		case Exact:
@@ -162,7 +161,6 @@ func DNS(resolvers []string, domain string, timeout time.Duration, record Record
 		default:
 			return 0, fmt.Errorf("selected strategy, %v, is not implmented", strategy)
 		}
-
 
 	}
 

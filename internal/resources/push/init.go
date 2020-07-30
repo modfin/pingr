@@ -12,7 +12,7 @@ import (
 func Init(g *echo.Group, buz *bus.Bus) {
 	// Listen to push requests
 	g.GET("/:test-id/:vanity-name", func(context echo.Context) error {
-		testId:= context.Param("test-id")
+		testId := context.Param("test-id")
 		db := context.Get("DB").(*sqlx.DB)
 
 		_, err := dao.GetTest(testId, db)
@@ -29,7 +29,7 @@ func Init(g *echo.Group, buz *bus.Bus) {
 	})
 
 	g.POST("/:test-id/:vanity-name", func(context echo.Context) error {
-		testId:= context.Param("test-id")
+		testId := context.Param("test-id")
 		db := context.Get("DB").(*sqlx.DB)
 
 		_, err := dao.GetTest(testId, db)

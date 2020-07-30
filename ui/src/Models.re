@@ -144,7 +144,8 @@ module Decode = {
             resBody: json |> optional(field("res_body", string)),
           })
         )
-      | "Prometheus" =>
+      | "Prometheus"
+      | "PrometheusPush" =>
         let metricDecoder = json => {
           Test.{
             key: json |> Decode.field("key", Decode.string),

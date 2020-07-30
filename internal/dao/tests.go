@@ -17,7 +17,7 @@ type TestStatus struct {
 
 type FullTestStatus struct {
 	pingr.GenericTest
-	StatusId     int    `json:"status_id" db:"status_id"`
+	StatusId int `json:"status_id" db:"status_id"`
 }
 
 func GetRawTests(db *sqlx.DB) ([]pingr.GenericTest, error) {
@@ -47,7 +47,6 @@ func GetTest(id string, db *sqlx.DB) (test pingr.Test, err error) {
 	test, err = t.Impl()
 	return
 }
-
 
 func PostTest(test pingr.GenericTest, db *sqlx.DB) error {
 	q := `
@@ -83,7 +82,6 @@ func DeleteTest(id string, db *sqlx.DB) error {
 	_, err := db.Exec(q, id)
 	return err
 }
-
 
 func GetTestStatus(id string, db *sqlx.DB) (FullTestStatus, error) {
 	q := `

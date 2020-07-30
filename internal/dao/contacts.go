@@ -45,7 +45,7 @@ func PostContact(contact pingr.Contact, db *sqlx.DB) error {
 	return nil
 }
 
-func PutContact(contact pingr.Contact,  db *sqlx.DB)  error {
+func PutContact(contact pingr.Contact, db *sqlx.DB) error {
 	q := `
 		UPDATE contacts 
 		SET contact_name=:contact_name,

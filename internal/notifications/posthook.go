@@ -9,14 +9,14 @@ import (
 )
 
 type notificationInformation struct {
-	TestId 			string 			`json:"test_id"`
-	TestName 		string 			`json:"test_name"`
-	Url 			string 			`json:"url"`
-	TestType 		string 			`json:"test_type"`
-	StatusCode 		uint 			`json:"status_code"`
-	StatusName 		string 			`json:"status_name"`
-	Message			string 			`json:"message"`
-	Interval 		time.Duration	`json:"interval"`
+	TestId     string        `json:"test_id"`
+	TestName   string        `json:"test_name"`
+	Url        string        `json:"url"`
+	TestType   string        `json:"test_type"`
+	StatusCode uint          `json:"status_code"`
+	StatusName string        `json:"status_name"`
+	Message    string        `json:"message"`
+	Interval   time.Duration `json:"interval"`
 }
 
 func PostHook(urls []string, test pingr.BaseTest, testErr error, statusCode uint) error {

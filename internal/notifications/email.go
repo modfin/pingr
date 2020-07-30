@@ -59,7 +59,6 @@ func SendEmail(receivers []string, test pingr.BaseTest, testErr error, db *sqlx.
 	return e.Send(fmt.Sprintf("%s:%d", config.Get().SMTPHost, config.Get().SMTPPort), a)
 }
 
-
 func getEmailBody(test pingr.BaseTest, testErr error, db *sqlx.DB) ([]byte, error) {
 	logs, err := dao.GetTestLogsLimited(test.TestId, 10, db)
 	if err != nil {
@@ -121,10 +120,10 @@ func getEmailBody(test pingr.BaseTest, testErr error, db *sqlx.DB) ([]byte, erro
 				Actions: []hermes.Action{
 					{
 						Button: hermes.Button{
-							Color: "#90ed7d", // Optional action button color
-							Text:  "View test",
+							Color:     "#90ed7d", // Optional action button color
+							Text:      "View test",
 							TextColor: "#000000",
-							Link:  config.Get().BaseUrl + "/tests/" + test.TestId,
+							Link:      config.Get().BaseUrl + "/tests/" + test.TestId,
 						},
 					},
 				},

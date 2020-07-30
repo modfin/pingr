@@ -19,7 +19,7 @@ func TLS(hostname string, port string, timeOut time.Duration) (time.Duration, er
 	now := time.Now()
 	then := now.AddDate(0, 1, 0)
 
-	dialer := net.Dialer{Timeout: timeOut*time.Second}
+	dialer := net.Dialer{Timeout: timeOut * time.Second}
 	netconn, err := dialer.Dial("tcp", fmt.Sprintf("%s:%s", hostname, port))
 	if err != nil {
 		return time.Since(now), err
@@ -47,7 +47,7 @@ func TLS(hostname string, port string, timeOut time.Duration) (time.Duration, er
 	certs := state.PeerCertificates
 	suite := GetCipherSuite(state.CipherSuite)
 
-	if suite == nil{
+	if suite == nil {
 		err = fmt.Errorf("could not find valid cipher suite for %d", state.CipherSuite)
 		return time.Since(now), err
 	}

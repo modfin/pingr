@@ -1,11 +1,11 @@
 package logging
 
 import (
-	"pingr/internal/config"
-	"pingr/internal/metrics"
 	"github.com/labstack/echo/v4"
 	"github.com/sirupsen/logrus"
 	"os"
+	"pingr/internal/config"
+	"pingr/internal/metrics"
 )
 
 func SetDefault() {

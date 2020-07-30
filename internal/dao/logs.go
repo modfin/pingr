@@ -56,7 +56,6 @@ func GetTestLogs(id string, db *sqlx.DB) ([]pingr.Log, error) {
 	return logs, nil
 }
 
-
 func GetTestLogsLimited(id string, limit int, db *sqlx.DB) ([]FullLog, error) {
 	q := `
 		SELECT sm.status_name, message, created_at, response_time FROM logs

@@ -8,7 +8,6 @@ import (
 	"time"
 )
 
-
 func HTTP(hostname string, method string, to time.Duration, reqHeaders map[string]string, reqBody string, resStatus int, resHeaders map[string]string, resBody string) (time.Duration, error) {
 	client := http.Client{Timeout: to}
 	start := time.Now()
@@ -19,8 +18,8 @@ func HTTP(hostname string, method string, to time.Duration, reqHeaders map[strin
 	}
 
 	// Set headers
-	for k,v := range reqHeaders {
-		req.Header.Set(k,v)
+	for k, v := range reqHeaders {
+		req.Header.Set(k, v)
 	}
 
 	resp, err := client.Do(req)
@@ -35,7 +34,7 @@ func HTTP(hostname string, method string, to time.Duration, reqHeaders map[strin
 	}
 
 	// Header check
-	for k,v := range resHeaders {
+	for k, v := range resHeaders {
 		if resp.Header.Get(k) != v {
 			return rt, fmt.Errorf("response header is not matching expected header, key: %s, got: %s, expected: %s", k, resp.Header.Get(k), v)
 		}

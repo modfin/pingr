@@ -22,7 +22,7 @@ func Init(g *echo.Group, buz *bus.Bus) {
 			return c.String(500, "Failed to get test: "+err.Error())
 		}
 
-		for i, _ := range tests {
+		for i := range tests {
 			err = tests[i].MaskSensitiveInfo(pingr.GET, nil)
 			if err != nil {
 				return c.String(500, "could not mask sensitive test data: "+err.Error())
@@ -128,11 +128,11 @@ func Init(g *echo.Group, buz *bus.Bus) {
 		testId := c.Param("testId")
 		err := dao.DeactivateTest(testId, db)
 		if err != nil {
-			return c.String(400, "could not deactivate test: " + err.Error())
+			return c.String(400, "could not deactivate test: "+err.Error())
 		}
 		err = buz.Publish("deactivate", []byte(testId))
 		if err != nil {
-			return c.String(400, "could not publish deactivation: " + err.Error())
+			return c.String(400, "could not publish deactivation: "+err.Error())
 		}
 
 		return c.String(200, "test paused")
@@ -144,12 +144,12 @@ func Init(g *echo.Group, buz *bus.Bus) {
 
 		test, err := dao.GetRawTest(testId, db)
 		if err != nil {
-			return c.String(400, "invalid test id: " + err.Error())
+			return c.String(400, "invalid test id: "+err.Error())
 		}
 
 		err = dao.ActivateTest(testId, db)
 		if err != nil {
-			return c.String(400, "could not activate test: " + err.Error())
+			return c.String(400, "could not activate test: "+err.Error())
 		}
 
 		data, err := json.Marshal(test)
@@ -158,7 +158,7 @@ func Init(g *echo.Group, buz *bus.Bus) {
 		}
 		err = buz.Publish("new", data)
 		if err != nil {
-			return c.String(400, "could not publish activation: " + err.Error())
+			return c.String(400, "could not publish activation: "+err.Error())
 		}
 
 		return c.String(200, "test activated")

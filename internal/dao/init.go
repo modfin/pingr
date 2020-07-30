@@ -57,7 +57,6 @@ func migrateSchema(db *sqlx.DB) error {
 		}
 	}
 
-
 	return nil
 }
 

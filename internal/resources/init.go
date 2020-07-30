@@ -39,7 +39,6 @@ func Init(closing <-chan struct{}, db *sqlx.DB, buz *bus.Bus) {
 		return validUser && validPass, nil
 	})
 
-
 	e := echo.New()
 	e.Use(logging.RequestIdMiddleware())
 	e.Use(logging.EchoMiddleware(nil))

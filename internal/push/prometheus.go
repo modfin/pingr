@@ -10,10 +10,10 @@ import (
 )
 
 type MetricTest struct {
-	Key			string 				`json:"key"`
-	LowerBound	float64 			`json:"lower_bound"`
-	UpperBound	float64 			`json:"upper_bound"`
-	Labels		map[string]string 	`json:"labels"`
+	Key        string            `json:"key"`
+	LowerBound float64           `json:"lower_bound"`
+	UpperBound float64           `json:"upper_bound"`
+	Labels     map[string]string `json:"labels"`
 }
 
 func (t MetricTest) Validate() bool {
@@ -28,7 +28,7 @@ func (t MetricTest) Validate() bool {
 
 var (
 	prevPromValues = make(map[string]float64)
-	mu sync.RWMutex
+	mu             sync.RWMutex
 )
 
 func Prometheus(testId string, body []byte, metricTests []MetricTest) error {
@@ -89,10 +89,9 @@ func Prometheus(testId string, body []byte, metricTests []MetricTest) error {
 	return err
 }
 
-
 func hash(testId string, promKey string, labels map[string]string) string {
 	hashedString := testId
-	hashedString+=promKey
+	hashedString += promKey
 
 	var labelsSlice []string
 	for k, v := range labels {
@@ -101,6 +100,6 @@ func hash(testId string, promKey string, labels map[string]string) string {
 	sort.Slice(labelsSlice, func(i, j int) bool {
 		return labelsSlice[i] < labelsSlice[j]
 	})
-	hashedString+=strings.Join(labelsSlice, "")
+	hashedString += strings.Join(labelsSlice, "")
 	return hashedString
 }

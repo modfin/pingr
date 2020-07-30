@@ -22,18 +22,18 @@ var (
 		"gb", // UK
 		"us", // US
 	}
-	dnsServerIpAddr []string
+	dnsServerIpAddr   []string
 	defaultDNSServers = []string{"8.8.8.8", "1.1.1.1"}
 )
 
 type publicDNSJSON struct {
-	Ip 			string 		`json:"ip"`
-	Reliability float32 	`json:"reliability"`
-	CheckedAt 	time.Time 	`json:"checked_at"`
+	Ip          string    `json:"ip"`
+	Reliability float32   `json:"reliability"`
+	CheckedAt   time.Time `json:"checked_at"`
 }
 
 func Get() []string {
-	once.Do(func(){
+	once.Do(func() {
 		oneMonthAgo := time.Now().AddDate(0, -1, 0)
 		for _, country := range _DNSServerEndpoints {
 			resp, err := http.Get(fmt.Sprintf("https://public-dns.info/nameserver/%s.json", country))
@@ -46,7 +46,7 @@ func Get() []string {
 				logrus.Error(fmt.Sprintf("Unable to parse DNSJSON from %s: %s", country, err.Error()))
 			}
 			for _, dnsServer := range dns {
-				if dnsServer.Reliability == 1 && oneMonthAgo.After(dnsServer.CheckedAt){
+				if dnsServer.Reliability == 1 && oneMonthAgo.After(dnsServer.CheckedAt) {
 					dnsServerIpAddr = append(dnsServerIpAddr, dnsServer.Ip)
 					break
 				}

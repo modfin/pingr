@@ -1,6 +1,5 @@
 package dao
 
-
 const _schema_v0_up = `
 CREATE TABLE IF NOT EXISTS _schema( 
     version int PRIMARY KEY,
@@ -8,7 +7,6 @@ CREATE TABLE IF NOT EXISTS _schema(
 );
 INSERT INTO _schema(version, created_at) VALUES (0, CURRENT_TIMESTAMP) ON CONFLICT DO NOTHING;
 `
-
 
 const _schema_v1_down = `
 -- name: drop-incident-contact-log
