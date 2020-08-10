@@ -1,13 +1,12 @@
+[@bs.module] external src: string = "../../../../assets/gopher.png";
+
 [@react.component]
 let make = () => {
   <nav className="flex items-center justify-between flex-wrap bg-gray-600 p-6">
     <div
       className="flex items-center flex-shrink-0 text-white mr-6 cursor-pointer"
       onClick={_ => Paths.goToTests()}>
-      <img
-        className="w-8 mb-3"
-        src="https://storage.googleapis.com/gopherizeme.appspot.com/gophers/62d0c3d5f52dbc9c803ea7bfaa2829d75a2f8fa2.png"
-      />
+      <img className="w-8 mb-3" src />
       <span className="font-semibold text-xl tracking-tight ml-1">
         {"Pingr" |> React.string}
       </span>

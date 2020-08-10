@@ -8,9 +8,16 @@ import (
 )
 
 type Config struct {
+	AutoTLS        bool     `env:"AUTO_TLS"`
+	AutoTLSDir     string   `env:"AUTO_TLS_DIR"`
+	AutoTLSDomains []string `env:"AUTO_TLS_DOMAINS" envSeparator:" "`
+	AutoTLSEmail   string   `env:"AUTO_TLS_EMAIL"`
+
+	PortHTTP  int `env:"HTTP_PORT" envDefault:"80"`
+	PortHTTPS int `env:"HTTPS_PORT" envDefault:"443"` // Only work with AutoTLS at the moment
+
 	Dev           bool   `env:"DEV" envDefault:"false"`
 	BaseUrl       string `env:"BASE_URL,required"`
-	Port          int    `env:"PORT" envDefault:"8080"`
 	SQLitePath    string `env:"SQLITE_PATH" envDefault:"pingr.sqlite"`
 	SQLiteMigrate bool   `env:"SQLITE_MIGRATE" envDefault:"false"`
 

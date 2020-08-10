@@ -14,6 +14,9 @@ services:
     environment:
       DEV: |-
         true
+      AUTO_TLS: "false"
+      AUTO_TLS_EMAIL: "agaton.sjoberg@modularfinance.se"
+      HTTP_PORT: 8080
       BASE_URL: "http://localhost:8080"
       BASIC_AUTH_USER: "dev"
       BASIC_AUTH_PASS: "123abc"
@@ -26,7 +29,6 @@ services:
     volumes:
       - go-pkg:/go/pkg
       - .:/go/src/pingr
-
   ui:
     build:
       context: .
@@ -38,6 +40,23 @@ services:
         true
     ports:
       - "8081:8081"
-#      - "8080:8080"
     volumes:
       - ./ui:/ui
+
+  pingr-built:
+    image: modfin/pingrd:latest
+    sysctls:
+      - net.ipv4.ping_group_range=0 2147483647
+    environment:
+      DEV: |-
+        true
+      PORT: 9090
+      BASE_URL: "http://localhost:9090"
+      BASIC_AUTH_USER: "dev"
+      BASIC_AUTH_PASS: "123abc"
+      SMTP_HOST: "smtp.gmail.com"
+      SMTP_USERNAME: "pingrman@gmail.com"
+      SMTP_PASSWORD: "2KPy8WJr2uLC46g"
+      AES_KEY: "6368616e676520746869732070617373776f726420746f206120736563726574"
+    ports:
+    - "9090:9090"

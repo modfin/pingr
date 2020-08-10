@@ -8,6 +8,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/crypto/acme/autocert"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -23,6 +24,7 @@ import (
 	"pingr/internal/resources/testcontacts"
 	"pingr/internal/resources/tests"
 	"pingr/ui"
+	"strings"
 )
 
 func Init(closing <-chan struct{}, db *sqlx.DB, buz *bus.Bus) {
@@ -81,10 +83,44 @@ func Init(closing <-chan struct{}, db *sqlx.DB, buz *bus.Bus) {
 		if err != nil {
 			return err
 		}
-		return c.Blob(200, http.DetectContentType(data), data)
+
+		var contentType string
+		var parts = strings.Split(p, ".")
+		switch parts[len(parts)-1] {
+		case "css":
+			contentType = "text/css"
+		case "html", "htm":
+			contentType = "text/html"
+		case "js":
+			contentType = "application/javascript"
+		default:
+			contentType = http.DetectContentType(data)
+		}
+		return c.Blob(200, contentType, data)
 	}, basicAuth)
 
-	go e.Start(fmt.Sprintf(":%d", config.Get().Port))
+	if cfg.AutoTLS {
+		go func() {
+			ee := echo.New()
+			ee.Pre(middleware.HTTPSRedirect())
+			ee.Logger.Fatal(ee.Start(fmt.Sprintf(":%d", config.Get().PortHTTP)))
+		}()
+
+		if len(cfg.AutoTLSDir) > 0 {
+			e.AutoTLSManager.Cache = autocert.DirCache(config.Get().AutoTLSDir)
+		}
+		if len(cfg.AutoTLSDomains) > 0 {
+			e.AutoTLSManager.HostPolicy = autocert.HostWhitelist(config.Get().AutoTLSDomains...)
+		}
+		if len(cfg.AutoTLSEmail) > 0 {
+			e.AutoTLSManager.Email = config.Get().AutoTLSEmail
+		}
+		go e.Logger.Fatal(e.StartAutoTLS(fmt.Sprintf(":%d", config.Get().PortHTTPS)))
+	} else {
+		go e.Logger.Fatal(e.Start(fmt.Sprintf(":%d", config.Get().PortHTTP)))
+	}
+
+	//go e.Start(fmt.Sprintf(":%d", config.Get().Port))
 
 	<-closing
 	c, cancel := context.WithTimeout(context.Background(), config.Get().TermDuration)
