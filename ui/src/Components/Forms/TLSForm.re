@@ -1,4 +1,4 @@
-type portFormTypes =
+type tlsFormTypes =
   /* Poll tests */
   | TestName
   | Interval
@@ -6,10 +6,11 @@ type portFormTypes =
   | Url
   /* Contacts */
   | Contacts
-  /* Port tests */
-  | Port;
+  /* TLS tests */
+  | Port
+  | AllowUnauthorizedOCSP;
 
-type portFormState = {
+type tlsFormState = {
   /* Poll tests */
   mutable testName: Form.t,
   mutable interval: Form.t,
@@ -17,8 +18,9 @@ type portFormState = {
   mutable url: Form.t,
   /* Contacts */
   mutable contacts: Form.t,
-  /* Port tests */
+  /* TLS tests */
   mutable port: Form.t,
+  mutable allowUnauthorizedOCSP: Form.t,
 };
 
 let getInitialFormState = () => {
@@ -28,11 +30,12 @@ let getInitialFormState = () => {
   url: Str(""),
   contacts: TupleList([]),
   port: Str(""),
+  allowUnauthorizedOCSP: Bool(false),
 };
 
-module PortFormConfig = {
-  type field = portFormTypes;
-  type state = portFormState;
+module TLSFormConfig = {
+  type field = tlsFormTypes;
+  type state = tlsFormState;
   let update = (field, value, state) => {
     switch (field, value) {
     | (TestName, v) => {...state, testName: v}
@@ -41,6 +44,7 @@ module PortFormConfig = {
     | (Url, v) => {...state, url: v}
     | (Contacts, v) => {...state, contacts: v}
     | (Port, v) => {...state, port: v}
+    | (AllowUnauthorizedOCSP, v) => {...state, allowUnauthorizedOCSP: v}
     };
   };
   let get = (field, state) => {
@@ -51,11 +55,12 @@ module PortFormConfig = {
     | Url => state.url
     | Contacts => state.contacts
     | Port => state.port
+    | AllowUnauthorizedOCSP => state.allowUnauthorizedOCSP
     };
   };
 };
 
-module PortForm = Form.FormComponent(PortFormConfig);
+module TLSForm = Form.FormComponent(TLSFormConfig);
 
 let rules = [
   (TestName, [(Form.NotEmpty, FormHelpers.emptyMsg)]),
@@ -74,7 +79,7 @@ let rules = [
   (Port, [(Form.NotEmpty, FormHelpers.emptyMsg)]),
 ];
 
-let getTestPayload = (~inputTest=?, values, testType) => {
+let getTestPayload = (~inputTest=?, values) => {
   let payload = Js.Dict.empty();
   switch (inputTest) {
   | Some(test) =>
@@ -90,7 +95,7 @@ let getTestPayload = (~inputTest=?, values, testType) => {
   | None => ()
   };
 
-  FormHelpers.setJsonKey(payload, "test_type", Str(testType));
+  FormHelpers.setJsonKey(payload, "test_type", Str("TLS"));
   FormHelpers.setJsonKey(payload, "test_name", values.testName);
   FormHelpers.setJsonKey(payload, "timeout", values.timeout);
   FormHelpers.setJsonKey(payload, "url", values.url);
@@ -98,6 +103,11 @@ let getTestPayload = (~inputTest=?, values, testType) => {
 
   let blob = Js.Dict.empty();
   FormHelpers.setJsonKey(blob, "port", values.port);
+  FormHelpers.setJsonKey(
+    blob,
+    "allow_unauthorized_ocsp",
+    values.allowUnauthorizedOCSP,
+  );
   Js.Dict.set(payload, "blob", Js.Json.object_(blob));
 
   payload;
@@ -106,7 +116,6 @@ let getTestPayload = (~inputTest=?, values, testType) => {
 [@react.component]
 let make =
     (
-      ~testType,
       ~submitTest,
       ~submitContacts,
       ~inputTest: option(Models.Test.t)=?,
@@ -154,7 +163,7 @@ let make =
     ReactEvent.Form.preventDefault(e);
     setSubmitted(_ => true);
     if (List.length(errors) == 0) {
-      let payload = getTestPayload(values, testType, ~inputTest);
+      let payload = getTestPayload(values, ~inputTest);
       submitTest(payload, postCallback(values));
     };
   };
@@ -163,11 +172,11 @@ let make =
     setSubmitted(_ => true);
     if (List.length(errors) == 0) {
       setTryTestMsg(_ => "Loading...");
-      let payload = getTestPayload(values, testType);
+      let payload = getTestPayload(values);
       Api.tryTest(payload, tryTestCallback);
     };
   };
-  <PortForm
+  <TLSForm
     initialState={
                    let init = getInitialFormState();
                    switch (inputTest) {
@@ -178,7 +187,10 @@ let make =
                      init.timeout = Int(test.timeout);
                      init.url = Str(test.url);
                      switch (test.specific) {
-                     | TCP(port) => init.port = Str(port.port)
+                     | TLS(tls) =>
+                       init.port = Str(tls.port);
+                       init.allowUnauthorizedOCSP =
+                         Bool(tls.allowUnauthorizedOCSP);
                      | _ => ()
                      };
                    };
@@ -199,7 +211,7 @@ let make =
                    init;
                  }
     rules
-    render={(f: PortForm.form) =>
+    render={(f: TLSForm.form) =>
       <form
         onSubmit={e => handleSubmit(e, f.form.values, f.form.errors)}
         className="w-full">
@@ -273,6 +285,31 @@ let make =
             value={f.form.values.port}
             onChange={v => v |> f.handleChange(Port)}
           />
+        </div>
+        <div className="flex flex-wrap -mx-3 mb-6">
+          <div className="w-full px-3 mb-6 md:mb-0">
+            <label
+              className="block uppercase tracking-wide text-gray-700 text-xs font-bold mb-2">
+              {"Allow unauthorized OCSP" |> React.string}
+            </label>
+            <input
+              type_="checkbox"
+              checked={
+                switch (f.form.values.allowUnauthorizedOCSP) {
+                | Bool(b) => b
+                | _ => false
+                }
+              }
+              onChange={e =>
+                Form.Bool(ReactEvent.Form.target(e)##checked)
+                |> f.handleChange(AllowUnauthorizedOCSP)
+              }
+            />
+            <p className="text-gray-600 text-xs italic">
+              {"Whether or not unauthorized OCSP responses should be allowed (*)"
+               |> React.string}
+            </p>
+          </div>
         </div>
         <FormTestContacts
           errorMsg={

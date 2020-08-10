@@ -17,6 +17,11 @@ module Test = {
 
   type portTest = {port: string};
 
+  type tls = {
+    port: string,
+    allowUnauthorizedOCSP: bool,
+  };
+
   type promMetrics = {metrics: list(promMetric)};
 
   type dns = {
@@ -34,7 +39,7 @@ module Test = {
   type specificTestInfo =
     | HTTP(http)
     | Prometheus(promMetrics)
-    | TLS(portTest)
+    | TLS(tls)
     | TCP(portTest)
     | DNS(dns)
     | SSH(ssh)
@@ -129,7 +134,14 @@ module Decode = {
       (testType: string, json: Js.Json.t): Test.specificTestInfo => {
     Json.(
       switch (testType) {
-      | "TLS" => Decode.(Test.TLS({port: json |> field("port", string)}))
+      | "TLS" =>
+        Decode.(
+          Test.TLS({
+            port: json |> field("port", string),
+            allowUnauthorizedOCSP:
+              json |> field("allow_unauthorized_ocsp", bool),
+          })
+        )
       | "TCP" => Decode.(Test.TCP({port: json |> field("port", string)}))
       | "HTTP" =>
         Decode.(

@@ -111,7 +111,15 @@ let make = () => {
                              "/api/push/"
                              ++ testStatus.testId
                              ++ "/"
-                             ++ String.escaped(testStatus.testName)
+                             ++ testStatus.testName
+                             |> String.map(c =>
+                                  if (c == ' ') {
+                                    '-';
+                                  } else {
+                                    c;
+                                  }
+                                )
+
                            | _ => testStatus.url
                            }
                          )

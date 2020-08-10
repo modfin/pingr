@@ -93,8 +93,7 @@ let make = (~id) => {
              submitContacts=Api.putTestContacts
            />
          | "TLS" =>
-           <PortTestForm
-             testType="TLS"
+           <TLSForm
              inputTest=test
              inputTestContacts=testContacts
              submitTest=Api.putTest
@@ -168,8 +167,7 @@ let make = (~id) => {
              submitContacts=Api.putTestContacts
            />
          | "TLS" =>
-           <PortTestForm
-             testType="TLS"
+           <TLSForm
              inputTest=test
              submitTest=Api.putTest
              submitContacts=Api.putTestContacts

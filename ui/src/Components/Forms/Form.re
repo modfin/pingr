@@ -2,6 +2,7 @@ type t =
   | Str(string)
   | Float(float)
   | Int(int)
+  | Bool(bool)
   | List(list(string))
   | TupleList(list((string, string)))
   | PromMetrics(list(Models.Test.promMetric));
@@ -15,6 +16,7 @@ let validate = (rule, value, values) =>
   | (NotEmpty, Str(s)) => s != ""
   | (NotEmpty, Int(i)) => i > 0
   | (NotEmpty, Float(f)) => f > 0.
+  | (NotEmpty, Bool(_)) => true
   | (NotEmpty, List(l)) => List.length(l) > 0
   | (NotEmpty, TupleList(l)) => List.length(l) > 0
   | (NotEmpty, PromMetrics(p)) =>

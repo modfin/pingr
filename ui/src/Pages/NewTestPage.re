@@ -46,8 +46,7 @@ let make = () => {
            submitContacts=Api.postTestContacts
          />
        | Str("TLS") =>
-         <PortTestForm
-           testType="TLS"
+         <TLSForm
            submitTest=Api.postTest
            submitContacts=Api.postTestContacts
          />

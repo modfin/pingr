@@ -15,6 +15,7 @@ let setJsonKey = (dict, keyName, value) => {
   switch (value) {
   | Form.Str(s) => Js.Dict.set(dict, keyName, Js.Json.string(s))
   | Form.Float(f) => Js.Dict.set(dict, keyName, Js.Json.number(f))
+  | Form.Bool(b) => Js.Dict.set(dict, keyName, Js.Json.boolean(b))
   | Form.Int(i) =>
     Js.Dict.set(dict, keyName, Js.Json.number(float_of_int(i)))
   | Form.List(l) =>

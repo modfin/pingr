@@ -112,7 +112,14 @@ let make = (~id) => {
                "/api/push/"
                ++ test.testId
                ++ "/"
-               ++ String.trim(test.testName)
+               ++ test.testName
+               |> String.map(c =>
+                    if (c == ' ') {
+                      '-';
+                    } else {
+                      c;
+                    }
+                  )
              | _ => test.url
              }
            )
@@ -189,7 +196,14 @@ let make = (~id) => {
                    {"Specific" |> React.string}
                  </p>
                  {switch (test.specific) {
-                  | TLS(port)
+                  | TLS(tls) =>
+                    <>
+                      <DataField labelName="Port" value={tls.port} />
+                      <DataField
+                        labelName="Unauthorized OCSP"
+                        value={string_of_bool(tls.allowUnauthorizedOCSP)}
+                      />
+                    </>
                   | TCP(port) =>
                     <DataField labelName="Port" value={port.port} />
                   | HTTP(http) =>

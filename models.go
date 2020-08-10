@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/jmoiron/sqlx/types"
+	"github.com/sirupsen/logrus"
 	"pingr/internal/bus"
 	"pingr/internal/platform/dns"
 	"pingr/internal/poll"
@@ -291,12 +292,14 @@ func (t TCPTest) Validate() bool {
 type TLSTest struct {
 	Blob struct {
 		Port string `json:"port"`
+		AllowUnauthorizedOCSP bool `json:"allow_unauthorized_ocsp"`
 	} `json:"blob"`
 	BaseTest
 }
 
 func (t TLSTest) RunTest(*bus.Bus) (time.Duration, error) {
-	return poll.TLS(t.Url, t.Blob.Port, t.Timeout)
+	logrus.Info(t)
+	return poll.TLS(t.Url, t.Blob.Port, t.Blob.AllowUnauthorizedOCSP, t.Timeout)
 }
 
 func (t TLSTest) Validate() bool {

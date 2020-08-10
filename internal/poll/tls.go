@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ocsp"
 	"io/ioutil"
 	"net"
@@ -14,7 +15,7 @@ import (
 	"time"
 )
 
-func TLS(hostname string, port string, timeOut time.Duration) (time.Duration, error) {
+func TLS(hostname string, port string, allowUnauthorizedOCSP bool, timeOut time.Duration) (time.Duration, error) {
 
 	now := time.Now()
 	then := now.AddDate(0, 1, 0)
@@ -57,6 +58,9 @@ func TLS(hostname string, port string, timeOut time.Duration) (time.Duration, er
 
 	}
 
+	var unauthorized ocsp.ResponseError
+	unauthorized.Status = 6
+
 	named := map[string]*x509.Certificate{}
 	for _, cert := range certs {
 		named[cert.Subject.String()] = cert
@@ -79,6 +83,12 @@ func TLS(hostname string, port string, timeOut time.Duration) (time.Duration, er
 			}
 			var res *ocsp.Response
 			res, err = GetOCSP(cert, issuer)
+			logrus.Info(err.Error())
+			logrus.Info(unauthorized.Error())
+			logrus.Info(err.Error() == unauthorized.Error())
+			if err != nil && err.Error() == unauthorized.Error() && allowUnauthorizedOCSP {
+				continue
+			}
 			if err != nil {
 				return time.Since(now), err
 			}
@@ -87,16 +97,9 @@ func TLS(hostname string, port string, timeOut time.Duration) (time.Duration, er
 				return time.Since(now), err
 			}
 		}
-
-		//fmt.Println("cert - exp:", cert.NotAfter)
-		//fmt.Println("      name:", cert.Subject)
-		//fmt.Println("    issuer:", cert.Issuer)
-		//fmt.Println("       sub:", base64.StdEncoding.EncodeToString(cert.SubjectKeyId))
-		//fmt.Println("      auth:", base64.StdEncoding.EncodeToString(cert.AuthorityKeyId))
-		//fmt.Println("        ca:", cert.IsCA)
 	}
 
-	return time.Since(now), err
+	return time.Since(now), nil
 }
 
 func GetOCSP(clientCert, issuerCert *x509.Certificate) (res *ocsp.Response, err error) {

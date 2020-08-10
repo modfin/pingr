@@ -1,7 +1,7 @@
 [@react.component]
 let make = (~labelName: string, ~value: string) => {
   <div className="md:flex md:items-center mb-6 mx-1">
-    <div className="w-20">
+    <div className="w-32">
       <label
         className="text-md block text-gray-700 font-bold mb-1 md:mb-0 pr-4">
         {labelName |> React.string}
