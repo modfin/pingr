@@ -3,18 +3,11 @@ volumes:
   go-pkg:
 
 services:
-  pingr:
-    build:
-      context: .
-      dockerfile: Dockerfile.dev
-      args:
-        UID: ${UID}
+  pingr-built:
+    image: modfin/pingrd:latest
     sysctls:
       - net.ipv4.ping_group_range=0 2147483647
     environment:
-      DEV: |-
-        true
-      AUTO_TLS: "false"
       HTTP_PORT: 8080
       BASE_URL: "http://localhost:8080"
       BASIC_AUTH_USER: "admin"
@@ -24,20 +17,4 @@ services:
       SMTP_PASSWORD: "smtpPassword"
       AES_KEY: "6368616e676520746869732070617373776f726420746f206120736563726574" ## Generate using 'openssl rand -hex 32'
     ports:
-    - "8080:8080"
-    volumes:
-      - go-pkg:/go/pkg
-      - .:/go/src/pingr
-  ui:
-    build:
-      context: .
-      dockerfile: Dockerfile.ui.dev
-      args:
-        UID: ${UID}
-    environment:
-      DEV: |-
-        true
-    ports:
-      - "8081:8081"
-    volumes:
-      - ./ui:/ui
+      - "8080:8080"
