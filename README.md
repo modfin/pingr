@@ -1,7 +1,7 @@
 # Pingr
 <img src="ui/assets/gopher.png" alt="pingr gopher" width="100"/>
 
-Pingr is a service that monitors the health of other services. It can send you an email or post-hook whenever a monitored service is behaving unexpectedly. 
+Pingr is a service which monitors the health of other services. It can send you an email or post-hook whenever a monitored service is behaving unexpectedly. 
 
 ## Supported methods
 
@@ -23,7 +23,7 @@ Push methods are the opposite, Pingr sets up a unique endpoint for each service 
 
 ## Running on local
 * Setup the `docker-compose.yml` file, see `docker-compose-example.yml`for an example.
-* `docker compose up`
+* `$ docker compose up`
 
 ## Production
 **Docker swarm example**
@@ -34,9 +34,9 @@ Push methods are the opposite, Pingr sets up a unique endpoint for each service 
 * Run the following (with the correct credentials)
 
 ```bash 
-mkdir -p /root/pingr
-mkdir -p /root/pingr-tls
-echo '
+$ mkdir -p /root/pingr
+$ mkdir -p /root/pingr-tls
+$ echo '
 version: "3.0"
 services:
   pingr:

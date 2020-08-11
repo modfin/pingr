@@ -8,9 +8,7 @@ require (
 	github.com/Masterminds/sprig v2.22.0+incompatible // indirect
 	github.com/PuerkitoBio/goquery v1.5.1 // indirect
 	github.com/andybalholm/cascadia v1.2.0 // indirect
-	github.com/aokoli/goutils v1.1.0 // indirect
 	github.com/caarlos0/env/v6 v6.2.2
-	github.com/gchaincl/dotsql v1.0.0
 	github.com/google/uuid v1.1.1
 	github.com/gosimple/slug v1.9.0
 	github.com/huandu/xstrings v1.3.2 // indirect

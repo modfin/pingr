@@ -6,7 +6,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ocsp"
 	"io/ioutil"
 	"net"
@@ -83,9 +82,6 @@ func TLS(hostname string, port string, allowUnauthorizedOCSP bool, timeOut time.
 			}
 			var res *ocsp.Response
 			res, err = GetOCSP(cert, issuer)
-			logrus.Info(err.Error())
-			logrus.Info(unauthorized.Error())
-			logrus.Info(err.Error() == unauthorized.Error())
 			if err != nil && err.Error() == unauthorized.Error() && allowUnauthorizedOCSP {
 				continue
 			}
