@@ -1,11 +1,10 @@
 #!/bin/bash
 
-rm -rf /go/src/pingr/ui && mkdir -p /go/src/pingr/ui/build
-go get -u github.com/go-bindata/go-bindata/...
-cd /go/src/pingr/ui && go-bindata -o fs.go -prefix "build/" -pkg ui build/
 
-cd /go/src/pingr; go mod download
+NAME=pingrd
+IMAGE_NAME=modfin/${NAME}
 
-go build -o /pingrd ./cmd/pingrd/pingrd.go
-
-./pingrd
+docker build -f ./Dockerfile.snap -t ${IMAGE_NAME}:snap  .
+docker create -ti --name dummy modfin/pingrd:snap bash
+docker cp dummy:/pingrd .
+docker rm -fv dummy
