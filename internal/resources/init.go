@@ -120,8 +120,6 @@ func Init(closing <-chan struct{}, db *sqlx.DB, buz *bus.Bus) {
 		go e.Logger.Fatal(e.Start(fmt.Sprintf(":%d", config.Get().PortHTTP)))
 	}
 
-	//go e.Start(fmt.Sprintf(":%d", config.Get().Port))
-
 	<-closing
 	c, cancel := context.WithTimeout(context.Background(), config.Get().TermDuration)
 	defer cancel()

@@ -1,12 +1,11 @@
 #!/bin/bash
 
-NAME=pingrd
-IMAGE_NAME=modfin/${NAME}
+rm -rf /go/src/pingr/ui && mkdir -p /go/src/pingr/ui/build
+go get -u github.com/go-bindata/go-bindata/...
+cd /go/src/pingr/ui && go-bindata -o fs.go -prefix "build/" -pkg ui build/
 
-docker build -f ./Dockerfile.build -t ${IMAGE_NAME}:latest -t ${IMAGE_NAME}:0.0.1 .
+cd /go/src/pingr; go mod download
 
-docker push modfin/${NAME}:latest
-docker push modfin/${NAME}:0.0.1
+go build -o /pingrd ./cmd/pingrd/pingrd.go
 
-echo -- start by --
-echo docker run -i -p 8080:8080 ${IMAGE_NAME}
+./pingrd
