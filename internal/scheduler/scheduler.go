@@ -152,11 +152,10 @@ func (s *Scheduler) commands() {
 
 func (s *Scheduler) worker(test pingr.GenericTest, close chan struct{}) {
 	// Spread out execution of tests
-	initSleep := rand.Int63n(int64((test.Timeout + test.Interval)/2))
-	if config.Get().Dev {
-		initSleep = 0
+	if !config.Get().Dev {
+		initSleep := rand.Int63n(int64((test.Timeout + test.Interval)/2))
+		time.Sleep(time.Duration(initSleep) * time.Second)
 	}
-	time.Sleep(time.Duration(initSleep) * time.Second)
 	for {
 		rt, err := test.RunTest(s.buz)
 

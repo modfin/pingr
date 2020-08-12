@@ -68,15 +68,15 @@ let make = () => {
                     ? <>
                         <thead className="flex w-full">
                           <tr className="flex w-full">
-                            <td
-                              className="font-bold px-4 py-2 lg:w-1/12 w-1/6">
+                            <td className="font-bold px-4 py-2 w-1/6">
                               {"Test name" |> React.string}
                             </td>
                             <td
                               className="font-bold px-4 py-2 lg:w-1/12 w-1/6">
                               {"Details" |> React.string}
                             </td>
-                            <td className="font-bold px-4 py-2 lg:w-2/3 w-1/2">
+                            <td
+                              className="font-bold px-4 py-2 lg:w-7/12 w-1/2">
                               {"Root cause" |> React.string}
                             </td>
                             <td className="font-bold px-4 py-2 w-1/6">
@@ -150,15 +150,15 @@ let make = () => {
                     ? <>
                         <thead className="flex w-full">
                           <tr className="flex w-full">
-                            <td
-                              className="font-bold px-4 py-2 lg:w-1/12 w-1/6">
+                            <td className="font-bold px-4 py-2 w-1/6">
                               {"Test name" |> React.string}
                             </td>
                             <td
                               className="font-bold px-4 py-2 lg:w-1/12 w-1/6">
                               {"Details" |> React.string}
                             </td>
-                            <td className="font-bold px-4 py-2 lg:w-1/2 w-1/3">
+                            <td
+                              className="font-bold px-4 py-2 lg:w-5/12 w-1/3">
                               {"Root cause" |> React.string}
                             </td>
                             <td className="font-bold px-4 py-2 w-1/6">

@@ -6,7 +6,6 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/jordan-wright/email"
 	"github.com/matcornic/hermes/v2"
-	"github.com/sirupsen/logrus"
 	"net/smtp"
 	"net/textproto"
 	"pingr"
@@ -20,8 +19,8 @@ var (
 	h = hermes.Hermes{
 		Product: hermes.Product{
 			Name: "Pingr",
-			Link: config.Get().BaseUrl, // TODO: find url?
-			Logo: "https://storage.googleapis.com/gopherizeme.appspot.com/gophers/62d0c3d5f52dbc9c803ea7bfaa2829d75a2f8fa2.png",
+			Link: config.Get().BaseUrl,
+			Logo: "https://raw.githubusercontent.com/itsy-sh/pingr/master/ui/assets/gopher.png",
 
 			Copyright: "https://github.com/itsy-sh/pingr",
 		},
@@ -29,8 +28,6 @@ var (
 )
 
 func SendEmail(receivers []string, test pingr.BaseTest, testErr error, db *sqlx.DB) error {
-	logrus.Info("sending email")
-
 	for i := range receivers {
 		// add '+test-name' to receivers
 		atIndex := strings.Index(receivers[i], "@")

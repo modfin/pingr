@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/jmoiron/sqlx/types"
-	"github.com/sirupsen/logrus"
 	"pingr/internal/bus"
 	"pingr/internal/platform/dns"
 	"pingr/internal/poll"
@@ -298,7 +297,6 @@ type TLSTest struct {
 }
 
 func (t TLSTest) RunTest(*bus.Bus) (time.Duration, error) {
-	logrus.Info(t)
 	return poll.TLS(t.Url, t.Blob.Port, t.Blob.AllowUnauthorizedOCSP, t.Timeout)
 }
 

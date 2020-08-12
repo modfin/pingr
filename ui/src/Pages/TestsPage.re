@@ -61,7 +61,7 @@ let make = () => {
         {"Refresh" |> React.string}
       </button>
     </Divider>
-    <div className="px-6">
+    <div className="px-6 pb-6">
       {switch (state) {
        | Loading =>
          <div className="py-2"> {ReasonReact.string("Loading...")} </div>
