@@ -89,7 +89,7 @@ let rules = [
       (Form.NotEmpty, FormHelpers.emptyMsg),
       (
         Form.Custom(FormHelpers.listValidation),
-        "Fill all values or remove unused once",
+        "Fill all values or remove unused one's",
       ),
     ],
   ),

@@ -249,7 +249,7 @@ let make =
             type_=Text
             width=Full
             label="Hostname"
-            infoText="Hostname that will be pinged (*)"
+            infoText="Hostname that will be polled (*)"
             errorMsg={
               submitted
                 ? FormHelpers.getError(Url, f.form.errors) : React.null

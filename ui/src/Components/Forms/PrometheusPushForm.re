@@ -69,7 +69,7 @@ let rules = [
       (Form.NotEmpty, "Lower bound < Upper bound and Key not empty"),
       (
         Form.Custom(PrometheusForm.labelCheck),
-        "Fill all label pairs or remove unused once",
+        "Fill all label pairs or remove unused one's",
       ),
     ],
   ),

@@ -36,9 +36,8 @@ Push methods are the opposite, Pingr sets up a unique endpoint for each service 
 ### General test settings
  + Hostname/Domain/Url - where test will poll against (poll tests)
  + Interval - duration between each test (poll tests)
- + Timeout - max allowed duration for test / max duration between each push (poll tests/push tests)
- 
- Interval is the time between each test. Timeout refers to the max allowed duration for a test.
+ + Timeout - max allowed duration for test / max duration between each push (poll tests / push tests)
+
 
 ### Actions upon unexpected test response
 When a test fails X amounts of times consecutively you can choose to send an email or post-hook to inform of the test failure. If the email should work properly the SMTP server and credentials has to be defined correctly in the `docker-compose.yml` file.

@@ -1,23 +1,3 @@
-module Loadable = {
-  type t('result) =
-    | Loading
-    | Failed(string)
-    | Success('result);
-};
-
-type action =
-  | LoadData
-  | LoadSuccess(list(Models.Log.t))
-  | LoadFail(string);
-
-type testState =
-  | NotAsked
-  | Loading
-  | Success(list(Models.Log.t))
-  | Failure;
-
-type state = Loadable.t(list(Models.Log.t));
-
 let toMicroSeconds = (duration): float => {
   duration /. 100000.;
 };

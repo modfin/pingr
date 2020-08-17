@@ -6,7 +6,6 @@ module Loadable = {
 };
 
 type action =
-  | LoadData
   | LoadSuccess(list(Models.TestContact.t))
   | LoadFail(string);
 
@@ -16,7 +15,6 @@ let make = (~testId) => {
     React.useReducer(
       (_state, action) =>
         switch (action) {
-        | LoadData => Loadable.Loading
         | LoadSuccess(testContacts) => Loadable.Success(testContacts)
         | LoadFail(msg) => Loadable.Failed(msg)
         },

@@ -81,7 +81,7 @@ module HttpFormConfig = {
 };
 
 module HttpForm = Form.FormComponent(HttpFormConfig);
-let keyMsg = "Fill keys and values or remove unused once";
+let keyMsg = "Fill keys and values or remove unused one's";
 
 let rules = [
   (TestName, [(Form.NotEmpty, FormHelpers.emptyMsg)]),
