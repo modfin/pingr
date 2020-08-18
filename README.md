@@ -62,8 +62,8 @@ Whenever a test fails an incident will be created and stored, regardless of some
 * Run the following (with the correct credentials)
 
 ```bash 
-$ mkdir -p /root/pingr
 $ mkdir -p /root/pingr-tls
+$ touch /root/pingr.sqlite
 $ echo '
 version: "3.0"
 services:
