@@ -73,6 +73,8 @@ CREATE TABLE IF NOT EXISTS logs (
 )
 ;
 
+CREATE INDEX IF NOT EXISTS logs_created_at ON logs(created_at DESC);
+
 -- name: create-status-map-table
 CREATE TABLE IF NOT EXISTS status_map (
     status_id  INTEGER PRIMARY KEY NOT NULL,
