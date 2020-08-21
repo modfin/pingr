@@ -1,5 +1,5 @@
-let toMicroSeconds = (duration): float => {
-  duration /. 100000.;
+let milliOfNano = (duration): float => {
+  duration /. 1000000.;
 };
 
 [@react.component]
@@ -129,7 +129,7 @@ let make = (~logs) => {
                        | _ =>
                          log.responseTime
                          |> float_of_int
-                         |> toMicroSeconds
+                         |> milliOfNano
                          |> Js.Float.toFixedWithPrecision(~digits=1)
                        }
                      )

@@ -133,7 +133,7 @@ let make = () => {
                            | _ =>
                              testStatus.responseTime
                              |> float_of_int
-                             |> LogList.toMicroSeconds
+                             |> LogList.milliOfNano
                              |> Js.Float.toFixedWithPrecision(~digits=1)
                            }
                          )

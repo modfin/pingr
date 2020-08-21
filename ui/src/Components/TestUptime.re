@@ -1,5 +1,5 @@
-let toMicroSeconds = (duration): float => {
-  duration /. 100000.;
+let milliOfNano = (duration): float => {
+  duration /. 1000000.;
 };
 
 [@react.component]
@@ -14,7 +14,7 @@ let make = (~rts, ~statuses, ~times, ~title_) => {
               rts
               |> List.rev_map(f =>
                    f
-                   |> toMicroSeconds
+                   |> milliOfNano
                    |> Js.Float.toFixedWithPrecision(~digits=1)
                    |> float_of_string
                  )

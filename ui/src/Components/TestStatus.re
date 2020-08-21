@@ -18,8 +18,8 @@ type testState =
 
 type state = Loadable.t(list(Models.Log.t));
 
-let toMicroSeconds = (duration): float => {
-  duration /. 100000.;
+let milliOfNano = (duration): float => {
+  duration /. 1000000.;
 };
 
 [@react.component]
