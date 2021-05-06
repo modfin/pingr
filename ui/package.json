@@ -38,7 +38,7 @@
     "bs-fetch": "^0.6.1",
     "bs-rsuite-ui-react": "^1.2.2",
     "es6-promise": "^4.2.8",
-    "highcharts": ">=6.0.0",
+    "highcharts": ">=9.0.0",
     "highcharts-react-official": "^3.0.0",
     "isomorphic-fetch": "^2.2.1",
     "postcss-flexbugs-fixes": "^4.2.1",
